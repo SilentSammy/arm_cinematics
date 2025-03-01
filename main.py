@@ -3,52 +3,11 @@ import time
 import numpy as np
 import matplotlib.pyplot as plt
 from arm import Arm, ArmDrawer, Goal
-
-class PSpaceDrawer:
-    def __init__(self, ax, arm, goal = None, obstacle = None):
-        # Objects to draw
-        self.ax = ax
-        self.arm_drawer = ArmDrawer(arm, ax)
-        self.goal = goal or Goal(0, 0)
-        self.obstacle = obstacle or (0, 0, 0.5)  # x, y, radius
-
-        # Setup ax
-        self.ax.set_title('Physical Space')
-        self.ax.set_xlim(-3, 3)
-        self.ax.set_ylim(-3, 3)
-        self.ax.set_xlabel("X")
-        self.ax.set_ylabel("Y")
-
-        # Create artists
-        self.goal_point = ax.plot([goal.x], [goal.y], 'go')[0]  # plot the goal position in physical space
-        self.obstacle_circle = plt.Circle((obstacle[0], obstacle[1]), obstacle[2], color='red', alpha=0.5)
-        self.ax.add_patch(self.obstacle_circle)
-
-        self.draw()
-
-    def draw(self):
-        # Draw the arm in physical space
-        self.arm_drawer.draw()
-
-        # plot the goal position in physical space
-        self.goal_point.set_data([self.goal.x], [self.goal.y])
-
-class CSpaceDrawer:
-    pass
+from drawer import PSpaceDrawer, CSpaceDrawer
 
 def draw():
-    global arm_pos, arm_drawer
-    angles = arm.get_joint_angles()
-    
     pspace_drawer.draw()
-
-    # draw the current arm position in C-space
-    arm_pos[0].set_data([angles[0]], [angles[1]])
-
-    # plot the goal position in C-space
-    c_space_points = goal.get_pos_cspace(arm)
-    for i in range(len(c_space_points)):
-        goal_point_c[i].set_data([c_space_points[i][0]], [c_space_points[i][1]])
+    cspace_drawer.draw()
 
     fig.canvas.draw_idle()
     fig.canvas.flush_events()
@@ -62,24 +21,10 @@ goal = Goal(-0.5, 0.75)  # goal position in physical space
 plt.ion()
 fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 6))
 pspace_drawer = PSpaceDrawer(ax1, arm, goal, obstacle)
-
-# Second subplot: C-space
-ax2.set_title('C-space')
-ax2.set_xlim(0, 360)
-ax2.set_ylim(0, 360)
-ax2.set_xlabel("Joint 1 Angle (degrees)")
-ax2.set_ylabel("Joint 2 Angle (degrees)")
-
-# Objects to plot
-arm_pos = ax2.plot(0, 0, 'bo') # plot the current position in C-space
-goal_point_c = []
-for p in goal.get_pos_cspace(arm):
-    goal_point_c.append(ax2.plot(p[0], p[1], 'go')[0])  # plot the goal position in C-space
-
-# List to store collision points in C-space
-c_space_points = []
+cspace_drawer = CSpaceDrawer(ax2, arm, goal, obstacle)
 
 def scan(visualize=True):
+    return
     def line_segment_distance(p1, p2, p):
         v = p2 - p1
         w = p - p1
@@ -205,7 +150,8 @@ def control_arm():
                 arm.dh[0]['theta'] -= a_vel * dt
             if key_state['right']:
                 arm.dh[0]['theta'] += a_vel * dt
-            print(f"Joint 1: {np.degrees(arm.dh[0]['theta']):.2f}°, Joint 2: {np.degrees(arm.dh[1]['theta']):.2f}°")
+            if any(key_state.values()):
+                print(f"Joint 1: {np.degrees(arm.dh[0]['theta']):.2f}°, Joint 2: {np.degrees(arm.dh[1]['theta']):.2f}°")
         elif control_mode == 2:
             if key_state['up']:
                 goal.y += lin_vel * dt
@@ -215,7 +161,8 @@ def control_arm():
                 goal.x -= lin_vel * dt
             if key_state['right']:
                 goal.x += lin_vel * dt
-            print(f"Goal Position: x={goal.x:.2f}, y={goal.y:.2f}")
+            if any(key_state.values()):
+                print(f"Joint 1: {np.degrees(arm.dh[0]['theta']):.2f}°, Joint 2: {np.degrees(arm.dh[1]['theta']):.2f}°")
 
         draw()
 

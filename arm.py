@@ -70,9 +70,13 @@ class Arm:
             y += link['r'] * np.sin(theta)
         return x, y
 
-    def get_joint_angles(self):
-        # But wrapped to 0-360 degrees
-        return [np.degrees(link['theta']) % 360 for link in self.dh]
+    def get_joint_angles(self, wrap=True, to_degrees=True):
+        angles = [link['theta'] for link in self.dh]
+        if to_degrees:
+            angles = [np.degrees(angle) for angle in angles]
+        if wrap:
+            angles = [angle % 360 for angle in angles]
+        return angles
 
     @property
     def num_joints(self):
