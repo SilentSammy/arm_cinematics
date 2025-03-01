@@ -5,7 +5,33 @@ import matplotlib.pyplot as plt
 from arm import Arm, ArmDrawer, Goal
 
 class PSpaceDrawer:
-    pass
+    def __init__(self, ax, arm, goal = None, obstacle = None):
+        # Objects to draw
+        self.ax = ax
+        self.arm_drawer = ArmDrawer(arm, ax)
+        self.goal = goal or Goal(0, 0)
+        self.obstacle = obstacle or (0, 0, 0.5)  # x, y, radius
+
+        # Setup ax
+        self.ax.set_title('Physical Space')
+        self.ax.set_xlim(-3, 3)
+        self.ax.set_ylim(-3, 3)
+        self.ax.set_xlabel("X")
+        self.ax.set_ylabel("Y")
+
+        # Create artists
+        self.goal_point = ax.plot([goal.x], [goal.y], 'go')[0]  # plot the goal position in physical space
+        self.obstacle_circle = plt.Circle((obstacle[0], obstacle[1]), obstacle[2], color='red', alpha=0.5)
+        self.ax.add_patch(self.obstacle_circle)
+
+        self.draw()
+
+    def draw(self):
+        # Draw the arm in physical space
+        self.arm_drawer.draw()
+
+        # plot the goal position in physical space
+        self.goal_point.set_data([self.goal.x], [self.goal.y])
 
 class CSpaceDrawer:
     pass
@@ -14,14 +40,12 @@ def draw():
     global arm_pos, arm_drawer
     angles = arm.get_joint_angles()
     
-    # draw the arm in physical space
-    arm_drawer.draw()
+    pspace_drawer.draw()
 
     # draw the current arm position in C-space
     arm_pos[0].set_data([angles[0]], [angles[1]])
 
-    # plot the goal position in physical space
-    goal_point[0].set_data([goal.x], [goal.y])
+    # plot the goal position in C-space
     c_space_points = goal.get_pos_cspace(arm)
     for i in range(len(c_space_points)):
         goal_point_c[i].set_data([c_space_points[i][0]], [c_space_points[i][1]])
@@ -29,16 +53,15 @@ def draw():
     fig.canvas.draw_idle()
     fig.canvas.flush_events()
 
+# Objects to plot
+arm = Arm()
+obstacle = (1, 1, 0.25) # x, y, radius
+goal = Goal(-0.5, 0.75)  # goal position in physical space
+
 # Initialize plotting
 plt.ion()
 fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 6))
-
-# First subplot: Physical Space
-ax1.set_title('Physical Space')
-ax1.set_xlim(-5, 5)
-ax1.set_ylim(-5, 5)
-ax1.set_xlabel("X")
-ax1.set_ylabel("Y")
+pspace_drawer = PSpaceDrawer(ax1, arm, goal, obstacle)
 
 # Second subplot: C-space
 ax2.set_title('C-space')
@@ -48,13 +71,7 @@ ax2.set_xlabel("Joint 1 Angle (degrees)")
 ax2.set_ylabel("Joint 2 Angle (degrees)")
 
 # Objects to plot
-arm = Arm()
-arm_drawer = ArmDrawer(arm, ax1)
 arm_pos = ax2.plot(0, 0, 'bo') # plot the current position in C-space
-obstacle = (1, 1, 0.25) # x, y, radius
-ax1.add_patch(plt.Circle((obstacle[0], obstacle[1]), obstacle[2], color='red', alpha=0.5)) # draw just once
-goal = Goal(-0.5, 0.75)  # goal position in physical space
-goal_point = ax1.plot([goal.x], [goal.y], 'go')  # plot the goal position in physical space
 goal_point_c = []
 for p in goal.get_pos_cspace(arm):
     goal_point_c.append(ax2.plot(p[0], p[1], 'go')[0])  # plot the goal position in C-space
