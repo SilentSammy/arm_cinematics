@@ -105,7 +105,7 @@ class CSpaceDrawer:
         self.collision_scatter = self.ax.scatter([], [], c='r')  # scatter plot for collision points
 
     def draw(self):
-        angles = self.arm.get_joint_angles()
+        angles = self.arm.get_joint_angles(wrap=True, as_degrees=True)
         
         # Update the current arm position marker in C-space
         self.end_point.set_data([angles[0]], [angles[1]])
@@ -114,6 +114,9 @@ class CSpaceDrawer:
         c_space_points = self.goal.get_pos_cspace(self.arm)
         for i in range(len(c_space_points)):
             self.goal_points[i].set_data([c_space_points[i][0]], [c_space_points[i][1]])
+
+        # Draw collision points
+        self.draw_collisions()
 
     def draw_collisions(self):
         if self.collisions:
@@ -142,8 +145,6 @@ class CSpaceDrawer:
         
         def add_point(point):
             self.collisions.append(point)
-            x_data, y_data = zip(*self.collisions)
-            self.collision_scatter.set_offsets(np.c_[x_data, y_data])
         
         self.collisions.clear()
         i = 0
@@ -186,5 +187,8 @@ class CSpaceDrawer:
         yield
 
     def scan(self):
+        """
+        Scan the C-space for collisions between the arm and the obstacle.
+        """
         for _ in self.scan_generator():
             pass

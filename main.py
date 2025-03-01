@@ -5,6 +5,22 @@ import matplotlib.pyplot as plt
 from arm import Arm, Goal
 from drawer import PSpaceDrawer, CSpaceDrawer
 
+def listen_for_keys(fig):
+    pressed_keys = set()
+    def on_key_press(event):
+        pressed_keys.add(event.key)
+
+    def on_key_release(event):
+        pressed_keys.discard(event.key)
+
+    fig.canvas.mpl_connect('key_press_event', on_key_press)
+    fig.canvas.mpl_connect('key_release_event', on_key_release)
+
+    def is_key_pressed(key):
+        return key in pressed_keys
+
+    return is_key_pressed
+
 def draw():
     pspace_drawer.draw()
     cspace_drawer.draw()
@@ -23,6 +39,8 @@ fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 6))
 pspace_drawer = PSpaceDrawer(ax1, arm, goal, obstacle)
 cspace_drawer = CSpaceDrawer(ax2, arm, goal, obstacle)
 
+is_key_pressed = listen_for_keys(fig)
+
 def spin():
     dt = 0
     last_time = None
@@ -39,61 +57,48 @@ def spin():
 def control_arm():
     a_vel = np.radians(90)  # Angular velocity in radians per second
     lin_vel = 1  # Linear velocity in units per second
-    key_state = {'up': False, 'down': False, 'left': False, 'right': False}
     control_mode = 1  # Default control mode (1 for arm, 2 for goal)
 
-    def on_key_press(event):
-        nonlocal control_mode
-        if event.key in key_state:
-            key_state[event.key] = True
-        elif event.key == '1':
-            control_mode = 1
-            print("Control mode: Arm")
-        elif event.key == '2':
-            control_mode = 2
-            print("Control mode: Goal")
-
-    def on_key_release(event):
-        if event.key in key_state:
-            key_state[event.key] = False
-
-    # Connect the key press and release events to the callbacks
-    fig.canvas.mpl_connect('key_press_event', on_key_press)
-    fig.canvas.mpl_connect('key_release_event', on_key_release)
     dt = 0
     last_time = None
     while True:
         dt = time.time() - last_time if last_time else 0
         last_time = time.time()
 
+        if is_key_pressed('1'):
+            control_mode = 1
+            print("Control mode: Arm")
+        elif is_key_pressed('2'):
+            control_mode = 2
+            print("Control mode: Goal")
+
         if control_mode == 1:
-            if key_state['up']:
+            if is_key_pressed('up'):
                 arm.dh[1]['theta'] += a_vel * dt
-            if key_state['down']:
+            if is_key_pressed('down'):
                 arm.dh[1]['theta'] -= a_vel * dt
-            if key_state['left']:
+            if is_key_pressed('left'):
                 arm.dh[0]['theta'] -= a_vel * dt
-            if key_state['right']:
+            if is_key_pressed('right'):
                 arm.dh[0]['theta'] += a_vel * dt
-            if any(key_state.values()):
+            if any(is_key_pressed(key) for key in ['up', 'down', 'left', 'right']):
                 print(f"Joint 1: {np.degrees(arm.dh[0]['theta']):.2f}°, Joint 2: {np.degrees(arm.dh[1]['theta']):.2f}°")
         elif control_mode == 2:
-            if key_state['up']:
+            if is_key_pressed('up'):
                 goal.y += lin_vel * dt
-            if key_state['down']:
+            if is_key_pressed('down'):
                 goal.y -= lin_vel * dt
-            if key_state['left']:
+            if is_key_pressed('left'):
                 goal.x -= lin_vel * dt
-            if key_state['right']:
+            if is_key_pressed('right'):
                 goal.x += lin_vel * dt
-            if any(key_state.values()):
-                print(f"Joint 1: {np.degrees(arm.dh[0]['theta']):.2f}°, Joint 2: {np.degrees(arm.dh[1]['theta']):.2f}°")
-
+            if any(is_key_pressed(key) for key in ['up', 'down', 'left', 'right']):
+                print(f"Goal Position: ({goal.x:.2f}, {goal.y:.2f})")
         draw()
 
 if __name__ == '__main__':
     scan_gen = cspace_drawer.scan_generator()
-    for _ in scan_gen:
-        cspace_drawer.draw_collisions()
-        draw()
+    for point in scan_gen:
+        pass
+    draw()
     control_arm()
