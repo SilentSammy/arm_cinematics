@@ -92,5 +92,8 @@ def control_arm():
         draw()
 
 if __name__ == '__main__':
-    cspace_drawer.scan()
+    scan_gen = cspace_drawer.scan_generator()
+    for _ in scan_gen:
+        cspace_drawer.draw_collisions()
+        draw()
     control_arm()
