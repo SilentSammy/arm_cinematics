@@ -2,7 +2,55 @@ import math
 import time
 import numpy as np
 import matplotlib.pyplot as plt
-from arm import Arm, ArmDrawer, Goal
+from arm import Arm, Goal
+
+class ArmDrawer:
+    def __init__(self, arm, ax):
+        self.arm = arm
+        self.ax = ax
+        self.point_artists = []  # to hold the plotted joint points
+        self.line_artists = []   # to hold the connecting line segments
+        self.range_artist = None  # to hold the range circle
+
+        # Draw the maximum movement range of the arm
+        self.draw_range_circle()
+
+    def draw_range_circle(self):
+        """
+        Draw a circle representing the maximum reach of the arm.
+        """
+        max_reach = sum(link['r'] for link in self.arm.dh)
+        circle = plt.Circle((0, 0), max_reach, color='r', fill=False, linestyle='--')
+        self.ax.add_artist(circle)
+        self.range_artist = circle
+
+    def draw(self):
+        """
+        Redraw the arm based on the Arm's current joint positions.
+        """
+        positions = self.arm.get_joint_positions()
+        
+        # Draw or update joint points
+        for i, (x, y) in enumerate(positions):
+            if i >= len(self.point_artists):
+                artist, = self.ax.plot([x], [y], 'bo')
+                self.point_artists.append(artist)
+            else:
+                self.point_artists[i].set_data([x], [y])
+        
+        # Draw or update lines between consecutive points
+        # There will be one fewer line than points.
+        for i in range(len(positions) - 1):
+            x1, y1 = positions[i]
+            x2, y2 = positions[i+1]
+            if i >= len(self.line_artists):
+                line_artist, = self.ax.plot([x1, x2], [y1, y2], 'k-')
+                self.line_artists.append(line_artist)
+            else:
+                self.line_artists[i].set_data([x1, x2], [y1, y2])
+    
+    def get_artists(self):
+        return self.point_artists + self.line_artists + [self.range_artist]
 
 class PSpaceDrawer:
     def __init__(self, ax, arm, goal = None, obstacle = None):
@@ -37,7 +85,7 @@ class CSpaceDrawer:
     def __init__(self, ax, arm, goal, obstacle):
         # Objects to draw
         self.ax = ax
-        self.arm:Arm = arm
+        self.arm: Arm = arm
         self.goal = goal
         self.obstacle = obstacle
 
@@ -49,18 +97,82 @@ class CSpaceDrawer:
         self.ax.set_ylabel("Joint 2 Angle (degrees)")
 
         # Create artists
-        self.arm_pos = ax.plot(0, 0, 'bo')[0]  # plot the current position in C-space
-        self.goal_point_c = []
+        self.end_point = ax.plot(0, 0, 'bo')[0]  # end effector position in C-space
+        self.goal_points = [] # goal positions in C-space
         for p in goal.get_pos_cspace(arm):
-            self.goal_point_c.append(ax.plot(p[0], p[1], 'go')[0])
-        
+            self.goal_points.append(ax.plot(p[0], p[1], 'go')[0])
+        self.collisions = [] # collision points in C-space
+
     def draw(self):
         angles = self.arm.get_joint_angles()
         
-        # draw the current arm position in C-space
-        self.arm_pos.set_data([angles[0]], [angles[1]])
+        # Update the current arm position marker in C-space
+        self.end_point.set_data([angles[0]], [angles[1]])
 
-        # plot the goal position in C-space
+        # Update goal markers based on inverse kinematics
         c_space_points = self.goal.get_pos_cspace(self.arm)
         for i in range(len(c_space_points)):
-            self.goal_point_c[i].set_data([c_space_points[i][0]], [c_space_points[i][1]])
+            self.goal_points[i].set_data([c_space_points[i][0]], [c_space_points[i][1]])
+        
+    def draw_collision(self):
+        if self.collisions:
+            x_data, y_data = zip(*self.collisions)
+            self.ax.plot(x_data, y_data, 'ro')
+
+    def scan(self):
+        def line_segment_distance(p1, p2, p):
+            v = p2 - p1
+            w = p - p1
+            vv = np.dot(v, v)
+            if vv < 1e-9:
+                return np.linalg.norm(p - p1)
+            t = np.dot(w, v) / vv
+            if t < 0.0:
+                return np.linalg.norm(p - p1)
+            elif t > 1.0:
+                return np.linalg.norm(p - p2)
+            else:
+                proj = p1 + t * v
+                return np.linalg.norm(p - proj)
+        
+        def add_point(point):
+            # simply add the point to the list of collisions
+            self.collisions.append(point)
+
+        arm = self.arm
+        obstacle = self.obstacle
+        self.collisions.clear()
+        i = 0
+        while i < 360:
+            j = 0
+            closest_dist = None
+            while j < 360:
+                arm.dh[0]['theta'] = np.radians(i)
+                arm.dh[1]['theta'] = np.radians(j)
+                pos = arm.get_joint_positions()
+
+                # Get distances for the two segments
+                dist1 = line_segment_distance(np.array(pos[0]), np.array(pos[1]), np.array(obstacle[:2]))
+                dist2 = line_segment_distance(np.array(pos[1]), np.array(pos[2]), np.array(obstacle[:2]))
+                dist = min(dist1, dist2)
+                closest_dist = dist if closest_dist is None else min(closest_dist, dist)
+
+                # Determine collision status
+                collision1 = dist1 < obstacle[2]
+                collision2 = dist2 < obstacle[2]
+                collision = collision1 or collision2
+                print(f"Joint 1 Angle: {i}, Joint 2 Angle: {j}, Distance 1: {dist1}, Distance 2: {dist2}", 
+                    "Collision!" if collision else "")
+                
+                if collision:
+                    add_point((i, j))
+                
+                # Adjust increments
+                increment1 = min(max(5, int(closest_dist * 20)), 90)  # first joint increment remains unchanged
+                increment2 = min(max(10, int(dist2 * 30)), 90)
+
+                j += increment2
+            i += increment1
+
+        # Final bulk draw for collision points if not visualizing in real time
+        self.draw_collision()

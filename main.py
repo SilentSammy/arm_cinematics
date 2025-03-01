@@ -2,7 +2,7 @@ import math
 import time
 import numpy as np
 import matplotlib.pyplot as plt
-from arm import Arm, ArmDrawer, Goal
+from arm import Arm, Goal
 from drawer import PSpaceDrawer, CSpaceDrawer
 
 def draw():
@@ -22,81 +22,6 @@ plt.ion()
 fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 6))
 pspace_drawer = PSpaceDrawer(ax1, arm, goal, obstacle)
 cspace_drawer = CSpaceDrawer(ax2, arm, goal, obstacle)
-
-def scan(visualize=True):
-    return
-    def line_segment_distance(p1, p2, p):
-        v = p2 - p1
-        w = p - p1
-        vv = np.dot(v, v)
-        if vv < 1e-9:
-            return np.linalg.norm(p - p1)
-        t = np.dot(w, v) / vv
-        if t < 0.0:
-            return np.linalg.norm(p - p1)
-        elif t > 1.0:
-            return np.linalg.norm(p - p2)
-        else:
-            proj = p1 + t * v
-            return np.linalg.norm(p - proj)
-    
-    i = 0
-    while i < 360:
-        j = 0
-        closest_dist = None
-        while j < 360:
-            arm.dh[0]['theta'] = np.radians(i)
-            arm.dh[1]['theta'] = np.radians(j)
-            pos = arm.get_joint_positions()
-
-            # Get distances for the two segments
-            dist1 = line_segment_distance(np.array(pos[0]), np.array(pos[1]), np.array(obstacle[:2]))
-            dist2 = line_segment_distance(np.array(pos[1]), np.array(pos[2]), np.array(obstacle[:2]))
-            dist = min(dist1, dist2)
-            closest_dist = dist if closest_dist is None else min(closest_dist, dist)
-
-            # Determine collision status
-            collision1 = dist1 < obstacle[2]
-            collision2 = dist2 < obstacle[2]
-            collision = collision1 or collision2
-            print(f"Joint 1 Angle: {i}, Joint 2 Angle: {j}, Distance 1: {dist1}, Distance 2: {dist2}", 
-                  "Collision!" if collision else "")
-            
-            # Store collision points and update current C-space position
-            if collision:
-                c_space_points.append((i, j))
-                # Bulk-add points if first segment collides
-                if collision1:
-                    for k in range(j, min(j + 360, 361), 20):
-                        c_space_points.append((i, k))
-                        if visualize:
-                            ax2.plot(i, k, 'ro')
-            if visualize:
-                # Update current C-space position marker
-                arm_pos[0].set_data([i], [j])
-                # Draw collision points so far
-                if c_space_points:
-                    x_data, y_data = zip(*c_space_points)
-                    ax2.plot(x_data, y_data, 'ro')
-                # Update arm drawing and canvas
-                arm_drawer.draw()
-                fig.canvas.draw_idle()
-                fig.canvas.flush_events()
-            
-            # Adjust increments; if first segment collides, skip rest of j-values in this iteration
-            increment1 = min(max(5, int(closest_dist * 20)), 90)  # first joint increment remains unchanged
-            increment2 = min(max(10, int(dist2 * 30)), 90)
-            if collision1:
-                increment2 = 360  # Skip checking second segment details for this i value
-            j += increment2
-        i += increment1
-
-    # Final bulk draw for collision points if not visualizing in real time
-    if not visualize and c_space_points:
-        x_data, y_data = zip(*c_space_points)
-        ax2.plot(x_data, y_data, 'ro')
-        fig.canvas.draw_idle()
-        fig.canvas.flush_events()
 
 def spin():
     dt = 0
@@ -167,5 +92,5 @@ def control_arm():
         draw()
 
 if __name__ == '__main__':
-    scan(False)
+    cspace_drawer.scan()
     control_arm()
