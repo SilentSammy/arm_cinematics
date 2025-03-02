@@ -98,25 +98,60 @@ class CSpaceDrawer:
 
         # Create artists
         self.end_point = ax.plot(0, 0, 'bo')[0]  # end effector position in C-space
-        self.goal_points = [] # goal positions in C-space
+        self.goal_points = []  # goal positions in C-space
         for p in goal.get_pos_cspace(arm):
             self.goal_points.append(ax.plot(p[0], p[1], 'go')[0])
-        self.collisions = [] # collision points in C-space
+        
+        # Create connection lines from end effector to each goal
+        self.closest_goal = None
+        self.arm_to_goal_line = ax.plot([], [], 'k--')[0]
+        self.goal_to_arm_line = ax.plot([], [], 'k--')[0]
+        
+        # Collision points in C-space
+        self.collisions = []
         self.collision_scatter = self.ax.scatter([], [], c='r')  # scatter plot for collision points
 
     def draw(self):
-        angles = self.arm.get_joint_angles(wrap=True, as_degrees=True)
-        
-        # Update the current arm position marker in C-space
-        self.end_point.set_data([angles[0]], [angles[1]])
+        # Get current arm angles (in degrees)
+        end_eff = self.arm.get_joint_angles(wrap=True, as_degrees=True)
+        self.end_point.set_data([end_eff[0]], [end_eff[1]])
 
-        # Update goal markers based on inverse kinematics
-        c_space_points = self.goal.get_pos_cspace(self.arm)
-        for i in range(len(c_space_points)):
-            self.goal_points[i].set_data([c_space_points[i][0]], [c_space_points[i][1]])
+        # Update IK goal markers
+        goals = self.goal.get_pos_cspace(self.arm)
+        for i, pt in enumerate(goals):
+            self.goal_points[i].set_data([pt[0]], [pt[1]])
 
-        # Draw collision points
+        self.draw_path(end_eff)
+
         self.draw_collisions()
+
+    def draw_path(self, end_eff):
+        # Get the closest goal computed by the Goal class
+        closest_goal = self.closest_goal
+        if closest_goal is None:
+            self.arm_to_goal_line.set_data([], [])
+            self.goal_to_arm_line.set_data([], [])
+            return
+
+        # Draw the direct connection line
+        self.arm_to_goal_line.set_data([end_eff[0], closest_goal[0]],
+                                    [end_eff[1], closest_goal[1]])
+
+        # If the goal is off-screen, compute wrapped positions and draw the wrapping line
+        if any(angle < 0 or angle > 360 for angle in closest_goal):
+            wrapped_end = [angle % 360 for angle in end_eff]
+            for i in range(len(closest_goal)):
+                if closest_goal[i] < 0:
+                    wrapped_end[i] += 360
+                elif closest_goal[i] > 360:
+                    wrapped_end[i] -= 360
+            wrapped_goal = tuple(angle % 360 for angle in closest_goal)
+            self.goal_to_arm_line.set_data([wrapped_end[0], wrapped_goal[0]],
+                                        [wrapped_end[1], wrapped_goal[1]])
+        else:
+            self.goal_to_arm_line.set_data([], [])
+        
+        self.closest_goal = None
 
     def draw_collisions(self):
         if self.collisions:
@@ -187,8 +222,5 @@ class CSpaceDrawer:
         yield
 
     def scan(self):
-        """
-        Scan the C-space for collisions between the arm and the obstacle.
-        """
         for _ in self.scan_generator():
             pass

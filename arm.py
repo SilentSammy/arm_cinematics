@@ -54,6 +54,35 @@ class Goal:
             self._cspace = [(np.degrees(theta1) % 360, np.degrees(theta2) % 360) for theta1, theta2 in self._cspace]
         return self._cspace
 
+    def pathfind(self, arm, goal_index=0):
+        # Get the current joint angles (in degrees), not wrapped to reflect the true position.
+        current_angles = arm.get_joint_angles(wrap=True, as_degrees=True)
+        
+        # Get the wrapped goals (each in range 0-360) computed from inverse kinematics.
+        wrapped_goals = self.get_pos_cspace(arm)
+        
+        candidates = []
+        # Define candidate shifts for each joint:
+        shifts = [-360, 0, 360]
+        for candidate in wrapped_goals:
+            # Generate candidate solutions for the candidate in all quadrants.
+            for shift0 in shifts:
+                for shift1 in shifts:
+                    # Candidate plus shift vector
+                    candidate_shifted = (candidate[0] + shift0, candidate[1] + shift1)
+                    # Compute Euclidean distance between candidate and current arm configuration.
+                    diff0 = candidate_shifted[0] - current_angles[0]
+                    diff1 = candidate_shifted[1] - current_angles[1]
+                    dist = np.hypot(diff0, diff1)
+                    candidates.append((dist, candidate_shifted))
+        
+        # Sort the candidate solutions based on distance.
+        candidates.sort(key=lambda x: x[0])
+        
+        # Choose one candidate using the goal_index parameter.
+        chosen_candidate = candidates[goal_index % len(candidates)][1]
+        return chosen_candidate
+
 class Arm:
     def __init__(self, dh=None):
         self.dh = dh or [
