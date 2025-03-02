@@ -1,6 +1,7 @@
 import time
 import numpy as np
 import matplotlib.pyplot as plt
+import cuadrant
 
 def inverse_kinematics(x, y, l1, l2):
     """
@@ -48,38 +49,38 @@ class Goal:
             self._y = value
             self._cspace = None
     
-    def get_pos_cspace(self, arm):
+    def get_pos_cspace(self, arm, wrap=True, as_degrees=True):
         if self._cspace is None:
             self._cspace = inverse_kinematics(self._x, self._y, arm.dh[0]['r'], arm.dh[1]['r'])
-            self._cspace = [(np.degrees(theta1) % 360, np.degrees(theta2) % 360) for theta1, theta2 in self._cspace]
+            if as_degrees:
+                self._cspace = [(np.degrees(theta1), np.degrees(theta2)) for theta1, theta2 in self._cspace]
+            if wrap:
+                self._cspace = [(theta1 % 360, theta2 % 360) for theta1, theta2 in self._cspace]
         return self._cspace
 
     def pathfind(self, arm, goal_index=0):
-        # Get the current joint angles (in degrees), not wrapped to reflect the true position.
+        # Get the current joint angles in degrees (true configuration)
         current_angles = arm.get_joint_angles(wrap=True, as_degrees=True)
         
-        # Get the wrapped goals (each in range 0-360) computed from inverse kinematics.
+        # Get the wrapped IK goals (in the 0-360 range)
         wrapped_goals = self.get_pos_cspace(arm)
         
         candidates = []
-        # Define candidate shifts for each joint:
-        shifts = [-360, 0, 360]
+        # For each IK solution, generate all virtual candidates
         for candidate in wrapped_goals:
-            # Generate candidate solutions for the candidate in all quadrants.
-            for shift0 in shifts:
-                for shift1 in shifts:
-                    # Candidate plus shift vector
-                    candidate_shifted = (candidate[0] + shift0, candidate[1] + shift1)
-                    # Compute Euclidean distance between candidate and current arm configuration.
-                    diff0 = candidate_shifted[0] - current_angles[0]
-                    diff1 = candidate_shifted[1] - current_angles[1]
-                    dist = np.hypot(diff0, diff1)
-                    candidates.append((dist, candidate_shifted))
+            # This returns a list of 9 candidate points (central and all neighbors)
+            virtual_candidates = cuadrant.compute_all_cuadrants(candidate, 360)
+            for candidate_shifted in virtual_candidates:
+                # Compute the Euclidean distance between this candidate and current config
+                diff0 = candidate_shifted[0] - current_angles[0]
+                diff1 = candidate_shifted[1] - current_angles[1]
+                dist = np.hypot(diff0, diff1)
+                candidates.append((dist, candidate_shifted))
         
-        # Sort the candidate solutions based on distance.
+        # Sort the candidate solutions by distance (ascending)
         candidates.sort(key=lambda x: x[0])
         
-        # Choose one candidate using the goal_index parameter.
+        # Return the candidate based on goal_index (cycling through if necessary)
         chosen_candidate = candidates[goal_index % len(candidates)][1]
         return chosen_candidate
 
@@ -121,5 +122,4 @@ class Arm:
             y = last_y + link['r'] * np.sin(theta)
             positions.append((x, y))
         return positions
-
 

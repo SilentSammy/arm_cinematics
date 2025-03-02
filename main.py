@@ -72,6 +72,7 @@ def spin():
 def pathfind():
     global goal_index
     goal_index = 0
+    cspace_drawer.closest_goal = None # Avoids the line drawing bug
 
     # Get the starting position (in degrees)
     start = arm.get_joint_angles(wrap=True, as_degrees=True)

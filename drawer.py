@@ -3,6 +3,7 @@ import time
 import numpy as np
 import matplotlib.pyplot as plt
 from arm import Arm, Goal
+import cuadrant
 
 class ArmDrawer:
     def __init__(self, arm, ax):
@@ -126,7 +127,7 @@ class CSpaceDrawer:
         self.draw_collisions()
 
     def draw_path(self, end_eff):
-        # Get the closest goal computed by the Goal class
+        # Get the user-selected goal
         closest_goal = self.closest_goal
         if closest_goal is None:
             self.arm_to_goal_line.set_data([], [])
@@ -134,24 +135,18 @@ class CSpaceDrawer:
             return
 
         # Draw the direct connection line
-        self.arm_to_goal_line.set_data([end_eff[0], closest_goal[0]],
-                                    [end_eff[1], closest_goal[1]])
+        self.arm_to_goal_line.set_data([end_eff[0], closest_goal[0]], [end_eff[1], closest_goal[1]])
 
-        # If the goal is off-screen, compute wrapped positions and draw the wrapping line
-        if any(angle < 0 or angle > 360 for angle in closest_goal):
-            wrapped_end = [angle % 360 for angle in end_eff]
-            for i in range(len(closest_goal)):
-                if closest_goal[i] < 0:
-                    wrapped_end[i] += 360
-                elif closest_goal[i] > 360:
-                    wrapped_end[i] -= 360
-            wrapped_goal = tuple(angle % 360 for angle in closest_goal)
-            self.goal_to_arm_line.set_data([wrapped_end[0], wrapped_goal[0]],
-                                        [wrapped_end[1], wrapped_goal[1]])
+        # if the goal is not in the central cuadrant, draw a line coming from the opposite cuadrant
+        if cuadrant.get_cuadrant(closest_goal, 360) != (0, 0):
+            cuadrant_goal = cuadrant.get_cuadrant(closest_goal, 360) # Get the cuadrant of the closest goal
+            opposite_cuadrant = cuadrant.get_opposite_cuadrant(cuadrant_goal) # Get the opposite cuadrant
+            opposite_end = cuadrant.compute_cuadrant(end_eff, opposite_cuadrant, 360) # Get the position of the end effector in the opposite cuadrant
+            centered_goal = cuadrant.compute_cuadrant(closest_goal, (0, 0), 360) # Get the centered goal
+            self.goal_to_arm_line.set_data([opposite_end[0], centered_goal[0]], [opposite_end[1], centered_goal[1]]) # Draw the wrapping line
         else:
             self.goal_to_arm_line.set_data([], [])
         
-        self.closest_goal = None
 
     def draw_collisions(self):
         if self.collisions:
