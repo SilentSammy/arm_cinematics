@@ -75,7 +75,7 @@ def pathfind():
     cspace_drawer.closest_goal = None # Avoids the line drawing bug
 
     # Get the starting position (in degrees)
-    start = arm.get_joint_angles(wrap=True, as_degrees=True)
+    start = arm.get_cspace_pos(wrap=True, as_degrees=True)
 
     # Define animation parameters:
     anim_progress = 0.0   # progress from 0.0 (start) to 1.0 (goal)
@@ -141,7 +141,7 @@ def control():
         
         # Only redraw if a key was pressed
         if any(is_key_down(key) for key in ['up', 'down', 'left', 'right', '1', '2']) or d_pressed or a_pressed:
-            cspace_drawer.closest_goal = target = goal.pathfind(arm, goal_index)
+            cspace_drawer.closest_goal = target = goal.pathfind(arm, cspace_drawer.collisions)
             draw()
         else: fig.canvas.flush_events()
             

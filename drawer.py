@@ -2,7 +2,7 @@ import math
 import time
 import numpy as np
 import matplotlib.pyplot as plt
-from arm import Arm, Goal
+from arm import Arm, Goal, line_segment_distance
 import cuadrant
 
 class ArmDrawer:
@@ -100,7 +100,7 @@ class CSpaceDrawer:
         # Create artists
         self.end_point = ax.plot(0, 0, 'bo')[0]  # end effector position in C-space
         self.goal_points = []  # goal positions in C-space
-        for p in goal.get_pos_cspace(arm):
+        for p in goal.get_cspace_pos(arm):
             self.goal_points.append(ax.plot(p[0], p[1], 'go')[0])
         
         # Create connection lines from end effector to each goal
@@ -114,11 +114,11 @@ class CSpaceDrawer:
 
     def draw(self):
         # Get current arm angles (in degrees)
-        end_eff = self.arm.get_joint_angles(wrap=True, as_degrees=True)
+        end_eff = self.arm.get_cspace_pos(wrap=True, as_degrees=True)
         self.end_point.set_data([end_eff[0]], [end_eff[1]])
 
         # Update IK goal markers
-        goals = self.goal.get_pos_cspace(self.arm)
+        goals = self.goal.get_cspace_pos(self.arm)
         for i, pt in enumerate(goals):
             self.goal_points[i].set_data([pt[0]], [pt[1]])
 
@@ -133,6 +133,16 @@ class CSpaceDrawer:
             self.arm_to_goal_line.set_data([], [])
             self.goal_to_arm_line.set_data([], [])
             return
+        
+        # Determine if the path to the goal collides
+        # collides = Goal.path_collides(end_eff, closest_goal, self.collisions)
+        collides = False # Disabled to save resources
+        print("Path collides!" if collides else "Path clear!")
+        
+        # Set color
+        line_color = 'r' if collides else 'k'
+        self.arm_to_goal_line.set_color(line_color)
+        self.goal_to_arm_line.set_color(line_color)
 
         # Draw the direct connection line
         self.arm_to_goal_line.set_data([end_eff[0], closest_goal[0]], [end_eff[1], closest_goal[1]])
@@ -158,20 +168,6 @@ class CSpaceDrawer:
         Generator version of scan that yields control after each inner loop iteration.
         The external loop can step through and animate each frame as desired.
         """
-        def line_segment_distance(p1, p2, p):
-            v = p2 - p1
-            w = p - p1
-            vv = np.dot(v, v)
-            if vv < 1e-9:
-                return np.linalg.norm(p - p1)
-            t = np.dot(w, v) / vv
-            if t < 0.0:
-                return np.linalg.norm(p - p1)
-            elif t > 1.0:
-                return np.linalg.norm(p - p2)
-            else:
-                proj = p1 + t * v
-                return np.linalg.norm(p - proj)
         
         def add_point(point):
             self.collisions.append(point)
