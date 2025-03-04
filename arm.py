@@ -1,7 +1,7 @@
 import time
 import numpy as np
 import matplotlib.pyplot as plt
-import cuadrant
+import quadrant
 
 def inverse_kinematics(x, y, l1, l2):
     """
@@ -83,7 +83,7 @@ class Goal:
 
         candidates = []
         for candidate in wrapped_goals:
-            virtual_candidates = cuadrant.compute_all_cuadrants(candidate, 360)
+            virtual_candidates = quadrant.compute_all_quadrants(candidate, 360)
             for candidate_shifted in virtual_candidates:
                 diff0 = candidate_shifted[0] - current_angles[0]
                 diff1 = candidate_shifted[1] - current_angles[1]
@@ -115,14 +115,14 @@ class Goal:
         p_target = np.array(target_cspace)
         
         # If the target is off the central quadrant, compute the wrapped path.
-        if cuadrant.get_cuadrant(target_cspace, 360) != (0, 0):
+        if quadrant.get_quadrant(target_cspace, 360) != (0, 0):
             # Get the target's quadrant and compute its opposite.
-            target_quad = cuadrant.get_cuadrant(target_cspace, 360)
-            opposite_quad = cuadrant.get_opposite_cuadrant(target_quad)
+            target_quad = quadrant.get_quadrant(target_cspace, 360)
+            opposite_quad = quadrant.get_opposite_quadrant(target_quad)
             # Compute a shifted start so that the line goes through the central region.
-            p_start = np.array(cuadrant.compute_cuadrant(start_cspace, opposite_quad, 360))
+            p_start = np.array(quadrant.compute_quadrant(start_cspace, opposite_quad, 360))
             # Make the target centered in the central quadrant.
-            p_target = np.array(cuadrant.compute_cuadrant(target_cspace, (0, 0), 360))
+            p_target = np.array(quadrant.compute_quadrant(target_cspace, (0, 0), 360))
         
         for collision in collision_list:
             collision_np = np.array(collision)

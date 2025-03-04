@@ -3,7 +3,7 @@ import time
 import numpy as np
 import matplotlib.pyplot as plt
 from arm import Arm, Goal, line_segment_distance
-import cuadrant
+import quadrant
 
 class ArmDrawer:
     def __init__(self, arm, ax):
@@ -147,12 +147,12 @@ class CSpaceDrawer:
         # Draw the direct connection line
         self.arm_to_goal_line.set_data([end_eff[0], closest_goal[0]], [end_eff[1], closest_goal[1]])
 
-        # if the goal is not in the central cuadrant, draw a line coming from the opposite cuadrant
-        if cuadrant.get_cuadrant(closest_goal, 360) != (0, 0):
-            cuadrant_goal = cuadrant.get_cuadrant(closest_goal, 360) # Get the cuadrant of the closest goal
-            opposite_cuadrant = cuadrant.get_opposite_cuadrant(cuadrant_goal) # Get the opposite cuadrant
-            opposite_end = cuadrant.compute_cuadrant(end_eff, opposite_cuadrant, 360) # Get the position of the end effector in the opposite cuadrant
-            centered_goal = cuadrant.compute_cuadrant(closest_goal, (0, 0), 360) # Get the centered goal
+        # if the goal is not in the central quadrant, draw a line coming from the opposite quadrant
+        if quadrant.get_quadrant(closest_goal, 360) != (0, 0):
+            quadrant_goal = quadrant.get_quadrant(closest_goal, 360) # Get the quadrant of the closest goal
+            opposite_quadrant = quadrant.get_opposite_quadrant(quadrant_goal) # Get the opposite quadrant
+            opposite_end = quadrant.compute_quadrant(end_eff, opposite_quadrant, 360) # Get the position of the end effector in the opposite quadrant
+            centered_goal = quadrant.compute_quadrant(closest_goal, (0, 0), 360) # Get the centered goal
             self.goal_to_arm_line.set_data([opposite_end[0], centered_goal[0]], [opposite_end[1], centered_goal[1]]) # Draw the wrapping line
         else:
             self.goal_to_arm_line.set_data([], [])
