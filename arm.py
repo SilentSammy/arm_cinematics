@@ -122,7 +122,7 @@ class Arm:
         self.dh = dh or [
             {'theta': math.radians(0), 'r': 1},
             {'theta': math.radians(0), 'r': 1},
-            # {'theta': math.radians(0), 'r': 1},
+            {'theta': math.radians(0), 'r': 1},
         ]
 
     def get_pspace_pos(self):
@@ -204,11 +204,11 @@ class Arm:
 
             # Get this and previous joint angles
             angles = self.get_joint_angles()[:joint_idx + 1]
-            print("Cascading collisions at angles:", angles)
+            print(f"Joint {joint_idx} cascading collisions at angles:", [round(np.degrees(angle), 0) for angle in angles])
 
-        def add_collision():
+        def add_collision(joint_idx):
             collisions.append(self.get_joint_angles())
-            print("Collision at angles:", collisions[-1])
+            print(f"Joint {joint_idx} colliding at angles:", [round(np.degrees(angle), 0) for angle in collisions[-1]])
         
         def get_next_step(joint_idx):
             # get the distance from the joint's origin to the obstacle
@@ -227,34 +227,52 @@ class Arm:
 
         def check_collision(joint_idx):
             collision = get_distance_to_obs(joint_idx) <= 0
-
             if collision:
                 if joint_idx == len(self.dh) - 1: # if it's a leaf joint
-                    add_collision()
+                    add_collision(joint_idx)
                 else: # if it's not a leaf joint
                     bulk_add_collisions(joint_idx)
 
             return collision
         
-        yield
-        if is_within_range(0):
-            i = 0
-            while i < 360:
-                colliding = check_collision(0)
+        def set_angle(joint_idx, angle):
+            nonlocal joint_positions
+            self.dh[joint_idx]['theta'] = np.radians(angle)
+            joint_positions = self.get_joint_positions()
+        
+        def get_angle(joint_idx):
+            return np.degrees(self.dh[joint_idx]['theta'])
 
-                if is_within_range(1) and not colliding: # only check joint 1 if joint 0 is not colliding, and if joint 1 is within range of the obstacle
-                    j = 0
-                    while j < 360:
-                        colliding = check_collision(1)
-                        
-                        # Move joint 2
-                        j = min(j + get_next_step(1), 360)
-                        self.dh[1]['theta'] = np.radians(j)
-                        joint_positions = self.get_joint_positions()
-                        yield
-                
-                # Move joint 1
-                i = min(i + get_next_step(0), 360)
-                self.dh[0]['theta'] = np.radians(i)
-                joint_positions = self.get_joint_positions()
+        def step_joint(joint_idx):
+            angle = min(get_angle(joint_idx) + get_next_step(joint_idx), 360)
+            set_angle(joint_idx, angle)
+
+        def recursive_scan(joint_idx):
+            if joint_idx >= self.num_joints:
+                # Base case: all joints have been set. Yield final configuration.
                 yield
+                return
+
+            # Initialize this joint angle to 0.
+            set_angle(joint_idx, 0)
+            # Continue adjusting this joint while less than 360.
+            while get_angle(joint_idx) < 360:
+                colliding = check_collision(joint_idx)
+                # If no collision on this joint, and if there is a subsequent joint to scan,
+                # and that subsequent joint is within range, drill down recursively.
+                if not colliding:
+                    if joint_idx < self.num_joints - 1 and is_within_range(joint_idx + 1):
+                        yield from recursive_scan(joint_idx + 1)
+                    # If at the last joint without collision, you might want to yield the config.
+                else:
+                    # If a collision is detected at a leaf joint, record it.
+                    if joint_idx == self.num_joints - 1:
+                        add_collision(joint_idx)
+                    # For intermediate joints, you could optionally handle "bulk" collisions here.
+                step_joint(joint_idx)
+                yield  # Yield control after each step.
+
+        # Start the recursive scan at joint 0.
+        yield from recursive_scan(0)
+        # Optionally, yield one final time after scanning is complete.
+        return collisions

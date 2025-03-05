@@ -38,7 +38,7 @@ def listen_for_keys(fig):
 
 # Objects to plot
 arm = Arm()
-obstacle = (-0.5, 0.5, 0.25) # x, y, radius
+obstacle = (1, 1, 0.25) # x, y, radius
 goal = Goal(-0.5, 0.75)  # goal position in physical space
 target = None
 
