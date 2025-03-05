@@ -171,71 +171,90 @@ class Arm:
             radius = sum(link['r'] for link in self.dh[i:])
             ranges.append((x1, y1, radius))
         return ranges
-
-    
-
-    def get_distance(self, point):
-        # Get the segments
-        pos = self.get_joint_positions()
-        segments = [(pos[i], pos[i+1]) for i in range(len(pos) - 1)]
-
-        # Get the distances between the point and the segments
-        distances = [help.line_segment_distance(seg[0], seg[1], point) for seg in segments]
-
-        return min(distances)
-
-    def get_distance_to_circle(self, c):
-        # c is a tuple (x, y, r)
-        circle_center = (c[0], c[1])
-        circle_radius = c[2]
-
-        # Get the distance from the arm to the circle center
-        distance_to_center = self.get_distance(circle_center)
-
-        # Subtract the circle radius to get the distance to the circle edge
-        distance_to_edge = distance_to_center - circle_radius
-
-        return distance_to_edge  # Ensure non-negative distance
-
-    def is_colliding(self, c):
-        return self.get_distance_to_circle(c) < 0
     
     def scan_cspace(self, obstacle):
         collisions = []
         distances = [0 for _ in self.dh]
+        joint_positions = self.get_joint_positions()
 
         def get_distance_to_obs(joint_idx):
-            get_joint_positions = self.get_joint_positions()
-            line = (get_joint_positions[joint_idx], get_joint_positions[joint_idx + 1])
-            center_dist = help.line_segment_distance(line[0], line[1], obstacle[:2])
-            return center_dist - obstacle[2]
+            # get the distance from the segment to the obstacle
+            line = (joint_positions[joint_idx], joint_positions[joint_idx + 1])
+            seg_dist = max(help.distance_line_to_circle(line, obstacle), 0)
+            distances[joint_idx] = seg_dist
+            return seg_dist
         
         def is_within_range(joint_idx):
             # if previous joints are not moved, can this joint and subsequent ones collide with the obstacle?
             return help.distance_between_circles(self.get_joint_ranges()[joint_idx], obstacle) < 0
 
+        def bulk_add_collisions(joint_idx):
+            possible_angles = list(range(0, 360, 20))
+
+            num_subsequent_joints = len(self.dh) - joint_idx
+
+            # get all possible combinations of angles for the subsequent joints
+            possible_joint_angles = help.all_possible_combinations(possible_angles, num_subsequent_joints)
+
+            # insert the current joint's angle at the beginning of each combination
+            collisions = [[self.dh[joint_idx]['theta']] + angles for angles in possible_joint_angles]
+
+            # add the collisions to the list
+            collisions.extend(collisions)
+
+            # Get this and previous joint angles
+            angles = self.get_joint_angles()[:joint_idx + 1]
+            print("Cascading collisions at angles:", angles)
+
         def add_collision():
             collisions.append(self.get_joint_angles())
             print("Collision at angles:", collisions[-1])
         
+        def get_next_step(joint_idx):
+            # get the distance from the joint's origin to the obstacle
+            origin = joint_positions[joint_idx]
+            origin_dist = max(help.distance_point_to_circle(origin, obstacle), 0)
+
+            seg_dist = distances[joint_idx]
+
+            # get a normalized distance based on the origin's distance being 1
+            dist = seg_dist / origin_dist if origin_dist > 0 else 0
+
+            # at a dist of 1, step is 30, at 0, step is 10
+            step = (dist * 20) + 10
+
+            return step
+
+        def check_collision(joint_idx):
+            collision = get_distance_to_obs(joint_idx) <= 0
+
+            if collision:
+                if joint_idx == len(self.dh) - 1: # if it's a leaf joint
+                    add_collision()
+                else: # if it's not a leaf joint
+                    bulk_add_collisions(joint_idx)
+
+            return collision
+        
+        yield
         if is_within_range(0):
             i = 0
             while i < 360:
-                self.dh[0]['theta'] = np.radians(i)
-                closest_dist = 0
-                if is_within_range(1):
+                colliding = check_collision(0)
+
+                if is_within_range(1) and not colliding: # only check joint 1 if joint 0 is not colliding, and if joint 1 is within range of the obstacle
                     j = 0
                     while j < 360:
-                        self.dh[1]['theta'] = np.radians(j)
-                        closest_dist = self.get_distance_to_circle(obstacle)
-                        if closest_dist < 0:
-                            add_collision()
-                        yield
+                        colliding = check_collision(1)
                         
-                        # Adjust increments
-                        increment2 = min(max(10, int(closest_dist * 30)), 90)
-                        j += increment2
-                increment1 = min(max(5, int(closest_dist * 20)), 90)
-                i += increment1
-                    
-            
+                        # Move joint 2
+                        j = min(j + get_next_step(1), 360)
+                        self.dh[1]['theta'] = np.radians(j)
+                        joint_positions = self.get_joint_positions()
+                        yield
+                
+                # Move joint 1
+                i = min(i + get_next_step(0), 360)
+                self.dh[0]['theta'] = np.radians(i)
+                joint_positions = self.get_joint_positions()
+                yield

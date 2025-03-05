@@ -38,7 +38,7 @@ def listen_for_keys(fig):
 
 # Objects to plot
 arm = Arm()
-obstacle = (-1, 1, 0.25) # x, y, radius
+obstacle = (-0.5, 0.5, 0.25) # x, y, radius
 goal = Goal(-0.5, 0.75)  # goal position in physical space
 target = None
 
@@ -153,5 +153,7 @@ def control():
 if __name__ == '__main__':
     for _ in arm.scan_cspace(obstacle):
         draw()
+        while not is_key_down('3'):
+            fig.canvas.flush_events()
     draw()
     control()

@@ -1,5 +1,10 @@
 import numpy as np
 
+def all_possible_combinations(lst, n):
+    if n == 0:
+        return [[]]
+    return [[x] + combo for x in lst for combo in all_possible_combinations(lst, n - 1)]
+
 def line_segment_distance(p1, p2, p):
     p1 = np.array(p1)
     p2 = np.array(p2)
@@ -21,6 +26,15 @@ def line_segment_distance(p1, p2, p):
 def distance_between_circles(c1, c2):
     # given two circles (x, y, r), return the distance between their edges
     return np.linalg.norm(np.array(c1[:2]) - np.array(c2[:2])) - c1[2] - c2[2]
+
+def distance_point_to_circle(p, c):
+    # given a point (x, y) and a circle (x, y, r), return the distance between the point and the circle's edge
+    return np.linalg.norm(np.array(p) - np.array(c[:2])) - c[2]
+
+def distance_line_to_circle(l, c):
+    # given a line segment ((x1, y1), (x2, y2)) and a circle (x, y, r), return the distance between the line and the circle's edge
+    dist_to_center = line_segment_distance(l[0], l[1], c[:2])
+    return dist_to_center - c[2]
 
 def compute_quadrant(point, quadrant, size):
     # Calculate the point in the central quadrant
