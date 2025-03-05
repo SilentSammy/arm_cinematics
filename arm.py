@@ -24,6 +24,37 @@ def inverse_kinematics(x, y, l1, l2):
     
     return (theta1_1, theta2_1), (theta1_2, theta2_2)
 
+def inverse_kinematics_3(arm, goal):
+    # clone the arm
+    arm = Arm(arm.dh.copy())
+
+    # if the goal is out of reach, return None
+    arm_range = arm.get_joint_ranges()[0]
+    if help.distance_point_to_circle(goal, arm_range) > 0:
+        return []
+
+    # spin the arm using the first joint
+    solutions = []
+    for i in range(0, 360, 36):
+        arm.dh[0]['theta'] = math.radians(i)
+
+        # check if joint 1 is within reach of the goal
+        rng = arm.get_joint_ranges()[1]
+        if help.distance_point_to_circle(goal, rng) <= 0:
+            # get the position of joint 1's origin
+            partial_arm_pos = arm.get_joint_positions()[1]
+
+            # offset the goal by the position of joint 1's origin (subtract)
+            offset_goal = (goal[0] - partial_arm_pos[0], goal[1] - partial_arm_pos[1])
+
+            # calculate the inverse kinematics from joint 1 onwards
+            ik = inverse_kinematics(offset_goal[0], offset_goal[1], arm.dh[1]['r'], arm.dh[2]['r'])
+            #append i to the start of the tuple
+            ik = [(i,) + theta for theta in ik]
+            solutions.extend(ik)
+
+    return solutions
+
 class Goal:
     def __init__(self, x, y):
         self._x = x
@@ -54,13 +85,22 @@ class Goal:
         return self._x, self._y
 
     def get_cspace_pos(self, arm, wrap=True, as_degrees=True):
-        if self._cspace is None:
-            self._cspace = inverse_kinematics(self._x, self._y, arm.dh[0]['r'], arm.dh[1]['r'])
-            if as_degrees:
-                self._cspace = [(np.degrees(theta1), np.degrees(theta2)) for theta1, theta2 in self._cspace]
-            if wrap:
-                self._cspace = [(theta1 % 360, theta2 % 360) for theta1, theta2 in self._cspace]
-        return tuple(self._cspace)
+        if arm.num_joints == 2:
+            if self._cspace is None:
+                self._cspace = inverse_kinematics(self._x, self._y, arm.dh[0]['r'], arm.dh[1]['r'])
+                if as_degrees:
+                    self._cspace = [(np.degrees(theta1), np.degrees(theta2)) for theta1, theta2 in self._cspace]
+                if wrap:
+                    self._cspace = [(theta1 % 360, theta2 % 360) for theta1, theta2 in self._cspace]
+            return tuple(self._cspace)
+        elif arm.num_joints == 3:
+            if self._cspace is None:
+                self._cspace = inverse_kinematics_3(arm, self.get_pspace_pos())
+                if as_degrees:
+                    self._cspace = [(np.degrees(theta1), np.degrees(theta2), np.degrees(theta3)) for theta1, theta2, theta3 in self._cspace]
+                if wrap:
+                    self._cspace = [(theta1 % 360, theta2 % 360, theta3 % 360) for theta1, theta2, theta3 in self._cspace]
+            return tuple(self._cspace)
 
     def get_paths(self, arm):
         # Same as pathfind but returns all candidates
@@ -181,7 +221,6 @@ class Arm:
 
         return all_collisions
 
-
     def cspace_scanner(self, obstacle):
         distances = [0 for _ in self.dh]
         joint_positions = self.get_joint_positions()
@@ -225,14 +264,17 @@ class Arm:
         # Collision handling
         def bulk_add_collisions(joint_idx):
             possible_angles = list(range(0, 360, 20))
+            # convert possible angles to radians
+            possible_angles = [np.radians(angle) for angle in possible_angles]
 
-            num_subsequent_joints = len(self.dh) - joint_idx
+            num_subsequent_joints = len(self.dh) - joint_idx - 1
 
             # get all possible combinations of angles for the subsequent joints
             possible_joint_angles = help.all_possible_combinations(possible_angles, num_subsequent_joints)
 
             # insert the current joint's angle at the beginning of each combination
-            collisions = [[self.dh[joint_idx]['theta']] + angles for angles in possible_joint_angles]
+            prev_angles = [dh['theta'] for dh in self.dh[joint_idx:]]
+            collisions = [prev_angles + angles for angles in possible_joint_angles]
 
             yield collisions
         def add_collision(joint_idx):
@@ -267,4 +309,3 @@ class Arm:
 
         # Start the recursive scan at joint 0.
         yield from recursive_scan(0)
-        # Optionally, yield one final time after scanning is complete.

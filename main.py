@@ -41,9 +41,10 @@ arm = Arm([
             {'theta': math.radians(0), 'r': 1},
             {'theta': math.radians(0), 'r': 1},
         ])
-obstacle = (1, 1, 0.4) # x, y, radius
+obstacle = (1, 1, 0.5) # x, y, radius
 goal = Goal(-0.5, 0.75)  # goal position in physical space
 target = None
+cspace_collisions = []
 
 # Initialize plotting
 plt.ion()
@@ -68,6 +69,8 @@ def spin():
 
         arm.dh[0]['theta'] += np.radians(180) * dt
         arm.dh[1]['theta'] += np.radians(90) * dt
+        if len(arm.dh) > 2:
+            arm.dh[2]['theta'] += np.radians(45) * dt
 
         # Redraw the canvas
         draw()
@@ -102,17 +105,14 @@ def pathfind():
     print("Goal reached!")
 
 def scan(animate=False):
-    start = time.time()
-    scanner = arm.cspace_scanner(obstacle)
-    for c in scanner:
-        if c is None:
-            if animate:
-                draw()
-        else:
-            # append all items in c to cspace_drawer.collisions
-            cspace_drawer.collisions.extend(c)
-    cspace_drawer.draw()
-    print("Time taken:", time.time() - start)
+    global cspace_collisions
+    
+    for c in arm.cspace_scanner(obstacle):
+        if c is not None:
+            cspace_collisions.extend(c)
+        elif animate:
+            cspace_drawer.draw_collisions(cspace_collisions)
+            draw()
     
 def control():
     global target
@@ -136,15 +136,21 @@ def control():
         elif is_key_down('p'):
             print("Control mode: Pathfinding")
             pathfind()
-        elif is_key_down('s'):
+        elif is_key_down('r'):
             print("Control mode: Scan")
-            scan(animate=True)
+            scan(True)
+        elif key_pressed('e'):
+            cspace_drawer.draw_collisions(cspace_collisions)
+            print("Showing collisions")
+        elif not is_key_down('e'):
+            cspace_drawer.draw_collisions([])
 
         # Control the arm or goal based on the control mode
         if control_mode == 1:
             arm.dh[0]['theta'] += a_vel * dt * (1 if is_key_down('right') else -1 if is_key_down('left') else 0)
             arm.dh[1]['theta'] += a_vel * dt * (1 if is_key_down('up') else -1 if is_key_down('down') else 0)
-            # arm.dh[2]['theta'] += a_vel * dt * (1 if is_key_down('d') else -1 if is_key_down('a') else 0)
+            if len(arm.dh) > 2:
+                arm.dh[2]['theta'] += a_vel * dt * (1 if is_key_down('d') else -1 if is_key_down('a') else 0)
             if any(is_key_down(key) for key in ['up', 'down', 'left', 'right']):
                 # print(f"Joint 1: {np.degrees(arm.dh[0]['theta']):.2f}°, Joint 2: {np.degrees(arm.dh[1]['theta']):.2f}°")
                 pass
@@ -154,12 +160,10 @@ def control():
             if any(is_key_down(key) for key in ['up', 'down', 'left', 'right']):
                 print(f"Goal Position: ({goal.x:.2f}, {goal.y:.2f})")
         
-        # Only redraw if a key was pressed
-        if any(is_key_down(key) for key in ['up', 'down', 'left', 'right', '1', '2', 'd', 'a']):
-            draw()
-        else: fig.canvas.flush_events()
+        # Redraw
+        draw()
             
 if __name__ == '__main__':
-    # scan(False)
+    scan(False)
     draw()
     control()

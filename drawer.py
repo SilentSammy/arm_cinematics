@@ -139,13 +139,12 @@ class CSpaceDrawer:
             self.goal_to_arm_line = self.ax.plot([], [], [], 'k--')[0]
 
         # Collision points in C-space
-        self.collisions = []
         if self.dimensions == 2:
             self.collision_scatter = self.ax.scatter([], [], c='r')  # scatter plot for collision points
         elif self.dimensions == 3:
             self.collision_scatter = self.ax.scatter([], [], [], c='r')  # scatter plot for collision points
 
-    def draw(self):
+    def draw_arm(self):
         # Get current arm angles (in degrees)
         end_eff = self.arm.get_cspace_pos(wrap=True, as_degrees=True)
 
@@ -154,10 +153,28 @@ class CSpaceDrawer:
         elif self.dimensions == 3:
             self.end_point._offsets3d = ([end_eff[0]], [end_eff[1]], [end_eff[2]])
 
+    def draw_goal(self):
         # Update IK goal markers
-        # goals = self.goal.get_cspace_pos(self.arm)
-        # for i, pt in enumerate(goals):
-        #     self.goal_points[i].set_data([pt[0]], [pt[1]])
+        goals = self.goal.get_cspace_pos(self.arm)
+        if self.dimensions == 2:
+            for i, pt in enumerate(goals):
+                if i >= len(self.goal_points):
+                    artist, = self.ax.plot([pt[0]], [pt[1]], 'go')
+                    self.goal_points.append(artist)
+                else:
+                    self.goal_points[i].set_data([pt[0]], [pt[1]])
+        elif self.dimensions == 3:
+            for i, pt in enumerate(goals):
+                if i >= len(self.goal_points):
+                    artist = self.ax.scatter([pt[0]], [pt[1]], [pt[2]], c='g', marker='o')
+                    self.goal_points.append(artist)
+                else:
+                    self.goal_points[i]._offsets3d = ([pt[0]], [pt[1]], [pt[2]])
+
+    def draw(self):
+        self.draw_arm()
+
+        self.draw_goal()
 
         # self.draw_path(end_eff)
 
@@ -195,9 +212,24 @@ class CSpaceDrawer:
             self.goal_to_arm_line.set_data([], [])
         
 
-    def draw_collisions(self):
-        if self.collisions:
-            x_data, y_data = zip(*self.collisions)
-            x_data = np.degrees(x_data)
-            y_data = np.degrees(y_data)
+    def draw_collisions(self, collisions):
+        if self.dimensions == 2:
+            if collisions:
+                x_data, y_data = zip(*collisions)
+                x_data = np.degrees(x_data)
+                y_data = np.degrees(y_data)
+            else:
+                x_data = []
+                y_data = []
             self.collision_scatter.set_offsets(np.c_[x_data, y_data])
+        elif self.dimensions == 3:
+            if collisions:
+                x_data, y_data, z_data = zip(*collisions)
+                x_data = np.degrees(x_data)
+                y_data = np.degrees(y_data)
+                z_data = np.degrees(z_data)
+            else:
+                x_data = []
+                y_data = []
+                z_data = []
+            self.collision_scatter._offsets3d = (x_data, y_data, z_data)
