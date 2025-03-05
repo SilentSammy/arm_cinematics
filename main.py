@@ -4,7 +4,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 from arm import Arm, Goal
 from drawer import PSpaceDrawer, CSpaceDrawer
-from help import distance_between_circles
 
 def listen_for_keys(fig):
     pressed_keys = set()
@@ -42,22 +41,22 @@ arm = Arm([
             {'theta': math.radians(0), 'r': 1},
             {'theta': math.radians(0), 'r': 1},
         ])
-obstacle = (1, 1, 0.25) # x, y, radius
+obstacle = (1, 1, 0.4) # x, y, radius
 goal = Goal(-0.5, 0.75)  # goal position in physical space
 target = None
 
 # Initialize plotting
 plt.ion()
-fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 6))
-pspace_drawer = PSpaceDrawer(ax1, arm, goal, obstacle)
-cspace_drawer = CSpaceDrawer(ax2, arm, goal, obstacle)
+fig, ax = plt.subplots(1, 2, figsize=(12, 6))
+pspace_drawer = PSpaceDrawer(ax[0], arm, goal, obstacle)
+cspace_drawer = CSpaceDrawer(fig, arm, goal, obstacle)
 
 # Listen for key presses
 is_key_down, key_pressed = listen_for_keys(fig)
 
 def draw():
     pspace_drawer.draw()
-    # cspace_drawer.draw()
+    cspace_drawer.draw()
     fig.canvas.flush_events()
 
 def spin():
@@ -103,12 +102,18 @@ def pathfind():
     print("Goal reached!")
 
 def scan(animate=False):
-    scanner = cspace_drawer.scan_generator()
-    for _ in scanner:
-        if animate:
-            draw()
-    draw()
-
+    start = time.time()
+    scanner = arm.cspace_scanner(obstacle)
+    for c in scanner:
+        if c is None:
+            if animate:
+                draw()
+        else:
+            # append all items in c to cspace_drawer.collisions
+            cspace_drawer.collisions.extend(c)
+    cspace_drawer.draw()
+    print("Time taken:", time.time() - start)
+    
 def control():
     global target
     a_vel = np.radians(180)  # Angular velocity in radians per second
@@ -155,14 +160,6 @@ def control():
         else: fig.canvas.flush_events()
             
 if __name__ == '__main__':
-    # start = time.time()
-    # for c in arm.cspace_scanner(obstacle):
-    #     pass
-    #     print(c)
-    #     if c is None:
-    #         draw()
-    # print("Time taken:", time.time() - start)
-    collisions = arm.scan_cspace(obstacle)
-    print(len(collisions))
+    # scan(False)
     draw()
     control()

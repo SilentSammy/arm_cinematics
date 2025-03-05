@@ -186,13 +186,13 @@ class Arm:
         distances = [0 for _ in self.dh]
         joint_positions = self.get_joint_positions()
 
+        # Obstacle detection
         def get_distance_to_obs(joint_idx):
             # get the distance from the segment to the obstacle
             line = (joint_positions[joint_idx], joint_positions[joint_idx + 1])
             seg_dist = max(help.distance_line_to_circle(line, obstacle), 0)
             distances[joint_idx] = seg_dist
             return seg_dist
-        
         def is_within_range(joint_idx):
             # if previous joints are not moved, can this joint and subsequent ones collide with the obstacle?
             return help.distance_between_circles(self.get_joint_ranges()[joint_idx], obstacle) < 0

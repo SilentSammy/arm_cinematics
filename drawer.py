@@ -4,6 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from arm import Arm, Goal
 import help
+from mpl_toolkits.mplot3d import Axes3D
 
 class ArmDrawer:
     def __init__(self, arm, ax):
@@ -90,48 +91,77 @@ class PSpaceDrawer:
         self.goal_point.set_data([self.goal.x], [self.goal.y])
 
 class CSpaceDrawer:
-    def __init__(self, ax, arm, goal, obstacle):
+    def __init__(self, fig, arm, goal, obstacle):
         # Objects to draw
-        self.ax = ax
+        self.fig = fig
         self.arm: Arm = arm
         self.goal = goal
         self.obstacle = obstacle
+        self.dimensions = self.arm.num_joints
 
         # Setup ax
-        self.ax.set_title('C-space')
-        self.ax.set_xlim(0, 360)
-        self.ax.set_ylim(0, 360)
-        self.ax.set_xlabel("Joint 1 Angle (degrees)")
-        self.ax.set_ylabel("Joint 2 Angle (degrees)")
+        if self.dimensions == 2:
+            self.ax = fig.add_subplot(1, 2, 2)
+            self.ax.set_title('C-space')
+            self.ax.set_xlim(0, 360)
+            self.ax.set_ylim(0, 360)
+            self.ax.set_xlabel("Joint 1 Angle (degrees)")
+            self.ax.set_ylabel("Joint 2 Angle (degrees)")
+        elif self.dimensions == 3:
+            self.ax = fig.add_subplot(1, 2, 2, projection='3d')
+            self.ax.set_title('C-space')
+            self.ax.set_xlim(0, 360)
+            self.ax.set_ylim(0, 360)
+            self.ax.set_zlim(0, 360)
+            self.ax.set_xlabel("Joint 1 Angle (degrees)")
+            self.ax.set_ylabel("Joint 2 Angle (degrees)")
+            self.ax.set_zlabel("Joint 3 Angle (degrees)")
 
         # Create artists
-        self.end_point = ax.plot(0, 0, 'bo')[0]  # end effector position in C-space
-        self.goal_points = []  # goal positions in C-space
-        for p in goal.get_cspace_pos(arm):
-            self.goal_points.append(ax.plot(p[0], p[1], 'go')[0])
-        
+        if self.dimensions == 2:
+            self.end_point = self.ax.plot(0, 0, 'bo')[0]  # end effector position in C-space
+            self.goal_points = []  # goal positions in C-space
+            # for p in goal.get_cspace_pos(arm):
+            #     self.goal_points.append(ax.plot(p[0], p[1], 'go')[0])
+        elif self.dimensions == 3:
+            self.end_point = self.ax.scatter(0, 0, 0, c='b', marker='o')  # end effector position in C-space
+            self.goal_points = []  # goal positions in C-space
+            # for p in goal.get_cspace_pos(arm):
+            #     self.goal_points.append(ax.scatter(p[0], p[1], p[2], c='g', marker='o'))
+
         # Create connection lines from end effector to each goal
         self.closest_goal = None
-        self.arm_to_goal_line = ax.plot([], [], 'k--')[0]
-        self.goal_to_arm_line = ax.plot([], [], 'k--')[0]
-        
+        if self.dimensions == 2:
+            self.arm_to_goal_line = self.ax.plot([], [], 'k--')[0]
+            self.goal_to_arm_line = self.ax.plot([], [], 'k--')[0]
+        elif self.dimensions == 3:
+            self.arm_to_goal_line = self.ax.plot([], [], [], 'k--')[0]
+            self.goal_to_arm_line = self.ax.plot([], [], [], 'k--')[0]
+
         # Collision points in C-space
         self.collisions = []
-        self.collision_scatter = self.ax.scatter([], [], c='r')  # scatter plot for collision points
+        if self.dimensions == 2:
+            self.collision_scatter = self.ax.scatter([], [], c='r')  # scatter plot for collision points
+        elif self.dimensions == 3:
+            self.collision_scatter = self.ax.scatter([], [], [], c='r')  # scatter plot for collision points
 
     def draw(self):
         # Get current arm angles (in degrees)
         end_eff = self.arm.get_cspace_pos(wrap=True, as_degrees=True)
-        self.end_point.set_data([end_eff[0]], [end_eff[1]])
+
+        if self.dimensions == 2:
+            self.end_point.set_data([end_eff[0]], [end_eff[1]])
+        elif self.dimensions == 3:
+            self.end_point._offsets3d = ([end_eff[0]], [end_eff[1]], [end_eff[2]])
 
         # Update IK goal markers
-        goals = self.goal.get_cspace_pos(self.arm)
-        for i, pt in enumerate(goals):
-            self.goal_points[i].set_data([pt[0]], [pt[1]])
+        # goals = self.goal.get_cspace_pos(self.arm)
+        # for i, pt in enumerate(goals):
+        #     self.goal_points[i].set_data([pt[0]], [pt[1]])
 
-        self.draw_path(end_eff)
+        # self.draw_path(end_eff)
 
-        self.draw_collisions()
+        # self.draw_collisions()
 
     def draw_path(self, end_eff):
         # Get the user-selected goal
@@ -168,57 +198,6 @@ class CSpaceDrawer:
     def draw_collisions(self):
         if self.collisions:
             x_data, y_data = zip(*self.collisions)
+            x_data = np.degrees(x_data)
+            y_data = np.degrees(y_data)
             self.collision_scatter.set_offsets(np.c_[x_data, y_data])
-
-    def scan_generator(self):
-        """
-        Generator version of scan that yields control after each inner loop iteration.
-        The external loop can step through and animate each frame as desired.
-        """
-        
-        def add_point(point):
-            self.collisions.append(point)
-        
-        self.collisions.clear()
-        i = 0
-        while i < 360:
-            j = 0
-            closest_dist = None
-            while j < 360:
-                self.arm.dh[0]['theta'] = np.radians(i)
-                self.arm.dh[1]['theta'] = np.radians(j)
-                pos = list(self.arm.get_joint_positions())
-
-                # Get distances for the two segments
-                dist1 = help.line_segment_distance(np.array(pos[0]), np.array(pos[1]), np.array(self.obstacle[:2]))
-                dist2 = help.line_segment_distance(np.array(pos[1]), np.array(pos[2]), np.array(self.obstacle[:2]))
-                dist = min(dist1, dist2)
-                closest_dist = dist if closest_dist is None else min(closest_dist, dist)
-
-                # Determine collision status
-                collision1 = dist1 < self.obstacle[2]
-                collision2 = dist2 < self.obstacle[2]
-                collision = collision1 or collision2
-                print(f"Joint 1 Angle: {i}, Joint 2 Angle: {j}, "
-                      f"Distance 1: {dist1}, Distance 2: {dist2}",
-                      "Collision!" if collision else "")
-                
-                if collision:
-                    add_point((i, j))
-                
-                # After each inner loop iteration, yield control.
-                yield  # external code may now update/redraw
-                
-                # Adjust increments
-                increment2 = min(max(10, int(dist2 * 30)), 90)
-                j += increment2
-            increment1 = min(max(5, int(closest_dist * 20)), 90)
-            i += increment1
-        
-        # At the end, yield one last time after drawing all collisions.
-        self.draw_collisions()
-        yield
-
-    def scan(self):
-        for _ in self.scan_generator():
-            pass
