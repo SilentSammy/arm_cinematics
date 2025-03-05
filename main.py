@@ -38,7 +38,7 @@ def listen_for_keys(fig):
 
 # Objects to plot
 arm = Arm()
-obstacle = (1, 1, 0.4) # x, y, radius
+obstacle = (-1, 1, 0.25) # x, y, radius
 goal = Goal(-0.5, 0.75)  # goal position in physical space
 target = None
 
@@ -53,8 +53,7 @@ is_key_down, key_pressed = listen_for_keys(fig)
 
 def draw():
     pspace_drawer.draw()
-    cspace_drawer.draw()
-    print(distance_between_circles(arm.get_joint_ranges()[1], obstacle))
+    # cspace_drawer.draw()
     fig.canvas.flush_events()
 
 def spin():
@@ -108,7 +107,7 @@ def scan(animate=False):
 
 def control():
     global target
-    a_vel = np.radians(90)  # Angular velocity in radians per second
+    a_vel = np.radians(180)  # Angular velocity in radians per second
     lin_vel = 1  # Linear velocity in units per second
     control_mode = 1  # Default control mode (1 for arm, 2 for goal)
 
@@ -134,8 +133,9 @@ def control():
 
         # Control the arm or goal based on the control mode
         if control_mode == 1:
-            arm.dh[1]['theta'] += a_vel * dt * (1 if is_key_down('up') else -1 if is_key_down('down') else 0)
             arm.dh[0]['theta'] += a_vel * dt * (1 if is_key_down('right') else -1 if is_key_down('left') else 0)
+            arm.dh[1]['theta'] += a_vel * dt * (1 if is_key_down('up') else -1 if is_key_down('down') else 0)
+            # arm.dh[2]['theta'] += a_vel * dt * (1 if is_key_down('d') else -1 if is_key_down('a') else 0)
             if any(is_key_down(key) for key in ['up', 'down', 'left', 'right']):
                 # print(f"Joint 1: {np.degrees(arm.dh[0]['theta']):.2f}°, Joint 2: {np.degrees(arm.dh[1]['theta']):.2f}°")
                 pass
@@ -151,4 +151,7 @@ def control():
         else: fig.canvas.flush_events()
             
 if __name__ == '__main__':
+    for _ in arm.scan_cspace(obstacle):
+        draw()
+    draw()
     control()

@@ -1,5 +1,23 @@
 import numpy as np
 
+def line_segment_distance(p1, p2, p):
+    p1 = np.array(p1)
+    p2 = np.array(p2)
+    p = np.array(p)
+    v = p2 - p1
+    w = p - p1
+    vv = np.dot(v, v)
+    if vv < 1e-9:
+        return np.linalg.norm(p - p1)
+    t = np.dot(w, v) / vv
+    if t < 0.0:
+        return np.linalg.norm(p - p1)
+    elif t > 1.0:
+        return np.linalg.norm(p - p2)
+    else:
+        proj = p1 + t * v
+        return np.linalg.norm(p - proj)
+
 def distance_between_circles(c1, c2):
     # given two circles (x, y, r), return the distance between their edges
     return np.linalg.norm(np.array(c1[:2]) - np.array(c2[:2])) - c1[2] - c2[2]

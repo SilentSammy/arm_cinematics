@@ -2,7 +2,7 @@ import math
 import time
 import numpy as np
 import matplotlib.pyplot as plt
-from arm import Arm, Goal, line_segment_distance
+from arm import Arm, Goal
 import help
 
 class ArmDrawer:
@@ -190,8 +190,8 @@ class CSpaceDrawer:
                 pos = list(self.arm.get_joint_positions())
 
                 # Get distances for the two segments
-                dist1 = line_segment_distance(np.array(pos[0]), np.array(pos[1]), np.array(self.obstacle[:2]))
-                dist2 = line_segment_distance(np.array(pos[1]), np.array(pos[2]), np.array(self.obstacle[:2]))
+                dist1 = help.line_segment_distance(np.array(pos[0]), np.array(pos[1]), np.array(self.obstacle[:2]))
+                dist2 = help.line_segment_distance(np.array(pos[1]), np.array(pos[2]), np.array(self.obstacle[:2]))
                 dist = min(dist1, dist2)
                 closest_dist = dist if closest_dist is None else min(closest_dist, dist)
 

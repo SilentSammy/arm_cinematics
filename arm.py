@@ -24,21 +24,6 @@ def inverse_kinematics(x, y, l1, l2):
     
     return (theta1_1, theta2_1), (theta1_2, theta2_2)
 
-def line_segment_distance(p1, p2, p):
-    v = p2 - p1
-    w = p - p1
-    vv = np.dot(v, v)
-    if vv < 1e-9:
-        return np.linalg.norm(p - p1)
-    t = np.dot(w, v) / vv
-    if t < 0.0:
-        return np.linalg.norm(p - p1)
-    elif t > 1.0:
-        return np.linalg.norm(p - p2)
-    else:
-        proj = p1 + t * v
-        return np.linalg.norm(p - proj)
-
 class Goal:
     def __init__(self, x, y):
         self._x = x
@@ -135,9 +120,9 @@ class Goal:
 class Arm:
     def __init__(self, dh=None):
         self.dh = dh or [
-            {'theta': np.radians(0), 'r': 1},
-            {'theta': np.radians(0), 'r': 1},
-            # {'theta': np.radians(0), 'r': 1},
+            {'theta': math.radians(0), 'r': 1},
+            {'theta': math.radians(0), 'r': 1},
+            # {'theta': math.radians(0), 'r': 1},
         ]
 
     def get_pspace_pos(self):
@@ -174,6 +159,9 @@ class Arm:
             positions.append((x, y))
         return positions
 
+    def get_joint_angles(self):
+        return tuple(link['theta'] for link in self.dh)
+
     def get_joint_ranges(self):
         # returns a list of x, y, and radius defining the joint ranges
         ranges = []
@@ -184,3 +172,70 @@ class Arm:
             ranges.append((x1, y1, radius))
         return ranges
 
+    
+
+    def get_distance(self, point):
+        # Get the segments
+        pos = self.get_joint_positions()
+        segments = [(pos[i], pos[i+1]) for i in range(len(pos) - 1)]
+
+        # Get the distances between the point and the segments
+        distances = [help.line_segment_distance(seg[0], seg[1], point) for seg in segments]
+
+        return min(distances)
+
+    def get_distance_to_circle(self, c):
+        # c is a tuple (x, y, r)
+        circle_center = (c[0], c[1])
+        circle_radius = c[2]
+
+        # Get the distance from the arm to the circle center
+        distance_to_center = self.get_distance(circle_center)
+
+        # Subtract the circle radius to get the distance to the circle edge
+        distance_to_edge = distance_to_center - circle_radius
+
+        return distance_to_edge  # Ensure non-negative distance
+
+    def is_colliding(self, c):
+        return self.get_distance_to_circle(c) < 0
+    
+    def scan_cspace(self, obstacle):
+        collisions = []
+        distances = [0 for _ in self.dh]
+
+        def get_distance_to_obs(joint_idx):
+            get_joint_positions = self.get_joint_positions()
+            line = (get_joint_positions[joint_idx], get_joint_positions[joint_idx + 1])
+            center_dist = help.line_segment_distance(line[0], line[1], obstacle[:2])
+            return center_dist - obstacle[2]
+        
+        def is_within_range(joint_idx):
+            # if previous joints are not moved, can this joint and subsequent ones collide with the obstacle?
+            return help.distance_between_circles(self.get_joint_ranges()[joint_idx], obstacle) < 0
+
+        def add_collision():
+            collisions.append(self.get_joint_angles())
+            print("Collision at angles:", collisions[-1])
+        
+        if is_within_range(0):
+            i = 0
+            while i < 360:
+                self.dh[0]['theta'] = np.radians(i)
+                closest_dist = 0
+                if is_within_range(1):
+                    j = 0
+                    while j < 360:
+                        self.dh[1]['theta'] = np.radians(j)
+                        closest_dist = self.get_distance_to_circle(obstacle)
+                        if closest_dist < 0:
+                            add_collision()
+                        yield
+                        
+                        # Adjust increments
+                        increment2 = min(max(10, int(closest_dist * 30)), 90)
+                        j += increment2
+                increment1 = min(max(5, int(closest_dist * 20)), 90)
+                i += increment1
+                    
+            
