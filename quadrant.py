@@ -1,4 +1,5 @@
 import numpy as np
+from itertools import product
 
 def compute_quadrant(point, quadrant, size):
     # Calculate the point in the central quadrant
@@ -12,11 +13,9 @@ def compute_quadrant(point, quadrant, size):
     return new_point
 
 def compute_all_quadrants(point, size):
-    # All possible pairs of -1, 0 and 1
-    quadrants = [(i, j) for i in range(-1, 2) for j in range(-1, 2)]
-
-    # Calculate the point in all quadrants
-    return [compute_quadrant(point, quadrant, size) for quadrant in quadrants]
+    dims = len(point)
+    cuadrants = list(product(range(-1, 2), repeat=dims))
+    return [compute_quadrant(point, quadrant, size) for quadrant in cuadrants]
 
 def get_quadrant(point, size):
     # Calculate the point in the central quadrant

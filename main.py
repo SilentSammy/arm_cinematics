@@ -44,7 +44,10 @@ target = None
 
 # Initialize plotting
 plt.ion()
-fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 6))
+fig, ax = plt.subplots(1, 2, figsize=(12, 6))
+ax1 = ax[0]
+ax2 = fig.add_subplot(1, 2, 2, projection='3d')
+
 pspace_drawer = PSpaceDrawer(ax1, arm, goal, obstacle)
 cspace_drawer = CSpaceDrawer(ax2, arm, goal, obstacle)
 
@@ -65,38 +68,46 @@ def spin():
 
         arm.dh[0]['theta'] += np.radians(180) * dt
         arm.dh[1]['theta'] += np.radians(90) * dt
-
+        
         # Redraw the canvas
         draw()
 
 def pathfind():
     global goal_index
     goal_index = 0
-    cspace_drawer.closest_goal = None # Avoids the line drawing bug
+    cspace_drawer.closest_goal = None  # Evita errores en la línea de conexión
 
-    # Get the starting position (in degrees)
+    # Obtener la posición inicial (en grados)
     start = arm.get_cspace_pos(wrap=True, as_degrees=True)
 
-    # Define animation parameters:
-    anim_progress = 0.0   # progress from 0.0 (start) to 1.0 (goal)
-    anim_speed = 0.5      # speed factor (adjust as needed)
-    
+    # Calcular la solución IK (camino) a partir del objetivo
+    target = goal.pathfind(arm, cspace_drawer.collisions)
+    if target is None:
+        print("No se encontró un camino libre de colisión.")
+        return  # O maneja el error de otra forma
+
+    # Parámetros de animación
+    anim_progress = 0.0  # progreso de 0.0 (inicio) a 1.0 (meta)
+    anim_speed = 0.5     # factor de velocidad (ajustable)
+
     dt = 0
     last_time = None
     while anim_progress < 1.0:
         dt = time.time() - last_time if last_time else 0
         last_time = time.time()
-        
-        # Update animation progress
+
+        # Actualizar el progreso de la animación
         anim_progress = min(anim_progress + dt * anim_speed, 1.0)
 
-        # Compute new angles by linear interpolation
-        new_angles = [ start[i] + anim_progress * (target[i] - start[i]) for i in range(len(start)) ]
+        # Interpolación lineal entre la posición inicial y el objetivo
+        new_angles = [start[i] + anim_progress * (target[i] - start[i])
+                      for i in range(len(start))]
         arm.dh[0]['theta'] = np.radians(new_angles[0])
         arm.dh[1]['theta'] = np.radians(new_angles[1])
-    
+        arm.dh[2]['theta'] = np.radians(new_angles[2])
+
         draw()
-    print("Goal reached!")
+    print("¡Objetivo alcanzado!")
 
 def control():
     global goal_index, target
@@ -131,6 +142,8 @@ def control():
         if control_mode == 1:
             arm.dh[1]['theta'] += a_vel * dt * (1 if is_key_down('up') else -1 if is_key_down('down') else 0)
             arm.dh[0]['theta'] += a_vel * dt * (1 if is_key_down('right') else -1 if is_key_down('left') else 0)
+            
+
             if any(is_key_down(key) for key in ['up', 'down', 'left', 'right']):
                 print(f"Joint 1: {np.degrees(arm.dh[0]['theta']):.2f}°, Joint 2: {np.degrees(arm.dh[1]['theta']):.2f}°")
         elif control_mode == 2:
