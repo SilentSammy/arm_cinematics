@@ -3,7 +3,7 @@ import time
 import numpy as np
 import matplotlib.pyplot as plt
 from arm import Arm, Goal, line_segment_distance
-import quadrant
+import help
 
 class ArmDrawer:
     def __init__(self, arm, ax):
@@ -11,25 +11,29 @@ class ArmDrawer:
         self.ax = ax
         self.point_artists = []  # to hold the plotted joint points
         self.line_artists = []   # to hold the connecting line segments
-        self.range_artist = None  # to hold the range circle
+        self.joint_range_artists = []
 
-        # Draw the maximum movement range of the arm
-        self.draw_range_circle()
+    def draw_joint_range_circles(self):
+        """
+        Draw circles around each joint's origin representing the maximum reach from that joint.
+        """
+        ranges = self.arm.get_joint_ranges() # this returns points with radiuses
 
-    def draw_range_circle(self):
-        """
-        Draw a circle representing the maximum reach of the arm.
-        """
-        max_reach = sum(link['r'] for link in self.arm.dh)
-        circle = plt.Circle((0, 0), max_reach, color='r', fill=False, linestyle='--')
-        self.ax.add_artist(circle)
-        self.range_artist = circle
+        # Draw the circles with dotted lines
+        for i, (x, y, r) in enumerate(ranges):
+            if i >= len(self.joint_range_artists):
+                artist = plt.Circle((x, y), r, color='b', fill=False, linestyle='dotted')
+                self.ax.add_patch(artist)
+                self.joint_range_artists.append(artist)
+            else:
+                self.joint_range_artists[i].center = (x, y)
+                self.joint_range_artists[i].radius = r
 
     def draw(self):
         """
         Redraw the arm based on the Arm's current joint positions.
         """
-        positions = self.arm.get_joint_positions()
+        positions = list(self.arm.get_joint_positions())
         
         # Draw or update joint points
         for i, (x, y) in enumerate(positions):
@@ -49,6 +53,9 @@ class ArmDrawer:
                 self.line_artists.append(line_artist)
             else:
                 self.line_artists[i].set_data([x1, x2], [y1, y2])
+        
+        # Draw joint range circles
+        self.draw_joint_range_circles()
     
     def get_artists(self):
         return self.point_artists + self.line_artists + [self.range_artist]
@@ -63,8 +70,8 @@ class PSpaceDrawer:
 
         # Setup ax
         self.ax.set_title('Physical Space')
-        self.ax.set_xlim(-3, 3)
-        self.ax.set_ylim(-3, 3)
+        self.ax.set_xlim(-4, 4)
+        self.ax.set_ylim(-4, 4)
         self.ax.set_xlabel("X")
         self.ax.set_ylabel("Y")
 
@@ -148,11 +155,11 @@ class CSpaceDrawer:
         self.arm_to_goal_line.set_data([end_eff[0], closest_goal[0]], [end_eff[1], closest_goal[1]])
 
         # if the goal is not in the central quadrant, draw a line coming from the opposite quadrant
-        if quadrant.get_quadrant(closest_goal, 360) != (0, 0):
-            quadrant_goal = quadrant.get_quadrant(closest_goal, 360) # Get the quadrant of the closest goal
-            opposite_quadrant = quadrant.get_opposite_quadrant(quadrant_goal) # Get the opposite quadrant
-            opposite_end = quadrant.compute_quadrant(end_eff, opposite_quadrant, 360) # Get the position of the end effector in the opposite quadrant
-            centered_goal = quadrant.compute_quadrant(closest_goal, (0, 0), 360) # Get the centered goal
+        if help.get_quadrant(closest_goal, 360) != (0, 0):
+            quadrant_goal = help.get_quadrant(closest_goal, 360) # Get the quadrant of the closest goal
+            opposite_quadrant = help.get_opposite_quadrant(quadrant_goal) # Get the opposite quadrant
+            opposite_end = help.compute_quadrant(end_eff, opposite_quadrant, 360) # Get the position of the end effector in the opposite quadrant
+            centered_goal = help.compute_quadrant(closest_goal, (0, 0), 360) # Get the centered goal
             self.goal_to_arm_line.set_data([opposite_end[0], centered_goal[0]], [opposite_end[1], centered_goal[1]]) # Draw the wrapping line
         else:
             self.goal_to_arm_line.set_data([], [])
@@ -180,7 +187,7 @@ class CSpaceDrawer:
             while j < 360:
                 self.arm.dh[0]['theta'] = np.radians(i)
                 self.arm.dh[1]['theta'] = np.radians(j)
-                pos = self.arm.get_joint_positions()
+                pos = list(self.arm.get_joint_positions())
 
                 # Get distances for the two segments
                 dist1 = line_segment_distance(np.array(pos[0]), np.array(pos[1]), np.array(self.obstacle[:2]))

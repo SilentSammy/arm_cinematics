@@ -4,6 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from arm import Arm, Goal
 from drawer import PSpaceDrawer, CSpaceDrawer
+from help import distance_between_circles
 
 def listen_for_keys(fig):
     pressed_keys = set()
@@ -39,7 +40,6 @@ def listen_for_keys(fig):
 arm = Arm()
 obstacle = (1, 1, 0.4) # x, y, radius
 goal = Goal(-0.5, 0.75)  # goal position in physical space
-goal_index = 0
 target = None
 
 # Initialize plotting
@@ -54,6 +54,7 @@ is_key_down, key_pressed = listen_for_keys(fig)
 def draw():
     pspace_drawer.draw()
     cspace_drawer.draw()
+    print(distance_between_circles(arm.get_joint_ranges()[1], obstacle))
     fig.canvas.flush_events()
 
 def spin():
@@ -98,8 +99,15 @@ def pathfind():
         draw()
     print("Goal reached!")
 
+def scan(animate=False):
+    scanner = cspace_drawer.scan_generator()
+    for _ in scanner:
+        if animate:
+            draw()
+    draw()
+
 def control():
-    global goal_index, target
+    global target
     a_vel = np.radians(90)  # Angular velocity in radians per second
     lin_vel = 1  # Linear velocity in units per second
     control_mode = 1  # Default control mode (1 for arm, 2 for goal)
@@ -109,12 +117,6 @@ def control():
     while True:
         dt = time.time() - last_time if last_time else 0
         last_time = time.time()
-
-        # Choose the next goal
-        d_pressed, a_pressed = key_pressed('d'), key_pressed('a')
-        goal_index += 1 if d_pressed else -1 if a_pressed else 0
-        if d_pressed or a_pressed:
-            print(f"Goal {goal_index}: {cspace_drawer.closest_goal}")
 
         # Change control mode (1 for arm, 2 for goal)
         if is_key_down('1'):
@@ -126,13 +128,17 @@ def control():
         elif is_key_down('p'):
             print("Control mode: Pathfinding")
             pathfind()
+        elif is_key_down('s'):
+            print("Control mode: Scan")
+            scan(animate=True)
 
         # Control the arm or goal based on the control mode
         if control_mode == 1:
             arm.dh[1]['theta'] += a_vel * dt * (1 if is_key_down('up') else -1 if is_key_down('down') else 0)
             arm.dh[0]['theta'] += a_vel * dt * (1 if is_key_down('right') else -1 if is_key_down('left') else 0)
             if any(is_key_down(key) for key in ['up', 'down', 'left', 'right']):
-                print(f"Joint 1: {np.degrees(arm.dh[0]['theta']):.2f}°, Joint 2: {np.degrees(arm.dh[1]['theta']):.2f}°")
+                # print(f"Joint 1: {np.degrees(arm.dh[0]['theta']):.2f}°, Joint 2: {np.degrees(arm.dh[1]['theta']):.2f}°")
+                pass
         elif control_mode == 2:
             goal.y += lin_vel * dt * (1 if is_key_down('up') else -1 if is_key_down('down') else 0)
             goal.x += lin_vel * dt * (1 if is_key_down('right') else -1 if is_key_down('left') else 0)
@@ -140,12 +146,9 @@ def control():
                 print(f"Goal Position: ({goal.x:.2f}, {goal.y:.2f})")
         
         # Only redraw if a key was pressed
-        if any(is_key_down(key) for key in ['up', 'down', 'left', 'right', '1', '2']) or d_pressed or a_pressed:
-            cspace_drawer.closest_goal = target = goal.pathfind(arm, cspace_drawer.collisions)
+        if any(is_key_down(key) for key in ['up', 'down', 'left', 'right', '1', '2', 'd', 'a']):
             draw()
         else: fig.canvas.flush_events()
             
 if __name__ == '__main__':
-    cspace_drawer.scan()
-    draw()
     control()

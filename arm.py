@@ -1,7 +1,8 @@
+import math
 import time
 import numpy as np
 import matplotlib.pyplot as plt
-import quadrant
+import help
 
 def inverse_kinematics(x, y, l1, l2):
     """
@@ -83,7 +84,7 @@ class Goal:
 
         candidates = []
         for candidate in wrapped_goals:
-            virtual_candidates = quadrant.compute_all_quadrants(candidate, 360)
+            virtual_candidates = help.compute_all_quadrants(candidate, 360)
             for candidate_shifted in virtual_candidates:
                 diff0 = candidate_shifted[0] - current_angles[0]
                 diff1 = candidate_shifted[1] - current_angles[1]
@@ -115,14 +116,14 @@ class Goal:
         p_target = np.array(target_cspace)
         
         # If the target is off the central quadrant, compute the wrapped path.
-        if quadrant.get_quadrant(target_cspace, 360) != (0, 0):
+        if help.get_quadrant(target_cspace, 360) != (0, 0):
             # Get the target's quadrant and compute its opposite.
-            target_quad = quadrant.get_quadrant(target_cspace, 360)
-            opposite_quad = quadrant.get_opposite_quadrant(target_quad)
+            target_quad = help.get_quadrant(target_cspace, 360)
+            opposite_quad = help.get_opposite_quadrant(target_quad)
             # Compute a shifted start so that the line goes through the central region.
-            p_start = np.array(quadrant.compute_quadrant(start_cspace, opposite_quad, 360))
+            p_start = np.array(help.compute_quadrant(start_cspace, opposite_quad, 360))
             # Make the target centered in the central quadrant.
-            p_target = np.array(quadrant.compute_quadrant(target_cspace, (0, 0), 360))
+            p_target = np.array(help.compute_quadrant(target_cspace, (0, 0), 360))
         
         for collision in collision_list:
             collision_np = np.array(collision)
@@ -136,6 +137,7 @@ class Arm:
         self.dh = dh or [
             {'theta': np.radians(0), 'r': 1},
             {'theta': np.radians(0), 'r': 1},
+            # {'theta': np.radians(0), 'r': 1},
         ]
 
     def get_pspace_pos(self):
@@ -167,7 +169,18 @@ class Arm:
         for link in self.dh:
             theta += link['theta']  # accumulate angle
             last_x, last_y = positions[-1]
-            x = last_x + link['r'] * np.cos(theta)
-            y = last_y + link['r'] * np.sin(theta)
+            x = last_x + link['r'] * math.cos(theta)
+            y = last_y + link['r'] * math.sin(theta)
             positions.append((x, y))
         return positions
+
+    def get_joint_ranges(self):
+        # returns a list of x, y, and radius defining the joint ranges
+        ranges = []
+        positions = self.get_joint_positions()
+        for i in range(len(positions) - 1):
+            x1, y1 = positions[i]
+            radius = sum(link['r'] for link in self.dh[i:])
+            ranges.append((x1, y1, radius))
+        return ranges
+

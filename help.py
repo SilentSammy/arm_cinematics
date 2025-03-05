@@ -1,5 +1,9 @@
 import numpy as np
 
+def distance_between_circles(c1, c2):
+    # given two circles (x, y, r), return the distance between their edges
+    return np.linalg.norm(np.array(c1[:2]) - np.array(c2[:2])) - c1[2] - c2[2]
+
 def compute_quadrant(point, quadrant, size):
     # Calculate the point in the central quadrant
     wrapped_point = tuple(v % size for v in point)
