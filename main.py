@@ -37,7 +37,11 @@ def listen_for_keys(fig):
     return is_key_down, is_key_pressed
 
 # Objects to plot
-arm = Arm()
+arm = Arm([
+            {'theta': math.radians(0), 'r': 1},
+            {'theta': math.radians(0), 'r': 1},
+            {'theta': math.radians(0), 'r': 1},
+        ])
 obstacle = (1, 1, 0.25) # x, y, radius
 goal = Goal(-0.5, 0.75)  # goal position in physical space
 target = None
@@ -151,9 +155,14 @@ def control():
         else: fig.canvas.flush_events()
             
 if __name__ == '__main__':
-    for _ in arm.scan_cspace(obstacle):
-        draw()
-        while not is_key_down('3'):
-            fig.canvas.flush_events()
+    # start = time.time()
+    # for c in arm.cspace_scanner(obstacle):
+    #     pass
+    #     print(c)
+    #     if c is None:
+    #         draw()
+    # print("Time taken:", time.time() - start)
+    collisions = arm.scan_cspace(obstacle)
+    print(len(collisions))
     draw()
     control()
