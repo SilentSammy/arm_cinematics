@@ -1,5 +1,12 @@
 import numpy as np
 
+def rotate_point(point, angle):
+    x, y = point
+    return (
+        x * np.cos(angle) - y * np.sin(angle),
+        x * np.sin(angle) + y * np.cos(angle)
+    )
+
 def all_possible_combinations(lst, n):
     if n == 0:
         return [[]]
@@ -49,10 +56,17 @@ def compute_quadrant(point, quadrant, size):
 
 def compute_all_quadrants(point, size):
     # All possible pairs of -1, 0 and 1
-    quadrants = [(i, j) for i in range(-1, 2) for j in range(-1, 2)]
+    if len(point) == 2:
+        quadrants = [(i, j) for i in range(-1, 2) for j in range(-1, 2)]
+    elif len(point) == 3:
+        quadrants = [(i, j, k) for i in range(-1, 2) for j in range(-1, 2) for k in range(-1, 2)]
 
     # Calculate the point in all quadrants
     return [compute_quadrant(point, quadrant, size) for quadrant in quadrants]
+
+# test
+# print(compute_all_quadrants((0, 0), 10))
+# print(compute_all_quadrants((0, 0, 0), 10))
 
 def get_quadrant(point, size):
     # Calculate the point in the central quadrant

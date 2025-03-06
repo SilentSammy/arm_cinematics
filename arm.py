@@ -43,15 +43,19 @@ def inverse_kinematics_3(arm, goal):
         if help.distance_point_to_circle(goal, rng) <= 0:
             # get the position of joint 1's origin
             partial_arm_pos = arm.get_joint_positions()[1]
+            
+            # offset the goal
+            offset_goal = goal
+            offset_goal = (goal[0] - partial_arm_pos[0], goal[1] - partial_arm_pos[1]) # offset the goal by the position of joint 1's origin (subtract)
+            offset_goal = help.rotate_point(offset_goal, math.radians(-i)) # rotate goal by i degrees
 
-            # offset the goal by the position of joint 1's origin (subtract)
-            offset_goal = (goal[0] - partial_arm_pos[0], goal[1] - partial_arm_pos[1])
-
-            # calculate the inverse kinematics from joint 1 onwards
-            ik = inverse_kinematics(offset_goal[0], offset_goal[1], arm.dh[1]['r'], arm.dh[2]['r'])
-            #append i to the start of the tuple
-            ik = [(i,) + theta for theta in ik]
-            solutions.extend(ik)
+            # calculate the inverse kinematics for the sub-arm formed by joints 1 and 2
+            sol1, sol2 = inverse_kinematics(offset_goal[0], offset_goal[1], arm.dh[1]['r'], arm.dh[2]['r'])
+            
+            # append i to the start of the tuples
+            sol1 = (math.radians(i),) + sol1
+            sol2 = (math.radians(i),) + sol2
+            solutions.extend([sol1, sol2])
 
     return solutions
 
@@ -105,7 +109,7 @@ class Goal:
     def get_paths(self, arm):
         # Same as pathfind but returns all candidates
         current_angles = arm.get_cspace_pos(wrap=True, as_degrees=True)
-        wrapped_goals = self.get_cspace_pos(arm)
+        wrapped_goals = self.get_cspace_pos(arm, wrap=True, as_degrees=True)
 
         candidates = []
         for candidate in wrapped_goals:
@@ -113,7 +117,11 @@ class Goal:
             for candidate_shifted in virtual_candidates:
                 diff0 = candidate_shifted[0] - current_angles[0]
                 diff1 = candidate_shifted[1] - current_angles[1]
-                dist = np.hypot(diff0, diff1)
+                if arm.num_joints == 2:
+                    dist = np.hypot(diff0, diff1)
+                elif arm.num_joints == 3:
+                    diff2 = candidate_shifted[2] - current_angles[2]
+                    dist = math.sqrt(diff0**2 + diff1**2 + diff2**2)
                 candidates.append((dist, candidate_shifted))
         candidates.sort(key=lambda x: x[0])
         return candidates
@@ -273,7 +281,7 @@ class Arm:
             possible_joint_angles = help.all_possible_combinations(possible_angles, num_subsequent_joints)
 
             # insert the current joint's angle at the beginning of each combination
-            prev_angles = [dh['theta'] for dh in self.dh[joint_idx:]]
+            prev_angles = [dh['theta'] for dh in self.dh[:joint_idx+1]]
             collisions = [prev_angles + angles for angles in possible_joint_angles]
 
             yield collisions

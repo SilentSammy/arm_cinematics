@@ -121,13 +121,9 @@ class CSpaceDrawer:
         if self.dimensions == 2:
             self.end_point = self.ax.plot(0, 0, 'bo')[0]  # end effector position in C-space
             self.goal_points = []  # goal positions in C-space
-            # for p in goal.get_cspace_pos(arm):
-            #     self.goal_points.append(ax.plot(p[0], p[1], 'go')[0])
         elif self.dimensions == 3:
             self.end_point = self.ax.scatter(0, 0, 0, c='b', marker='o')  # end effector position in C-space
             self.goal_points = []  # goal positions in C-space
-            # for p in goal.get_cspace_pos(arm):
-            #     self.goal_points.append(ax.scatter(p[0], p[1], p[2], c='g', marker='o'))
 
         # Create connection lines from end effector to each goal
         self.closest_goal = None
@@ -144,10 +140,7 @@ class CSpaceDrawer:
         elif self.dimensions == 3:
             self.collision_scatter = self.ax.scatter([], [], [], c='r')  # scatter plot for collision points
 
-    def draw_arm(self):
-        # Get current arm angles (in degrees)
-        end_eff = self.arm.get_cspace_pos(wrap=True, as_degrees=True)
-
+    def draw_end_eff(self, end_eff):
         if self.dimensions == 2:
             self.end_point.set_data([end_eff[0]], [end_eff[1]])
         elif self.dimensions == 3:
@@ -172,45 +165,61 @@ class CSpaceDrawer:
                     self.goal_points[i]._offsets3d = ([pt[0]], [pt[1]], [pt[2]])
 
     def draw(self):
-        self.draw_arm()
+        
+        # Get current arm angles (in degrees)
+        end_eff = self.arm.get_cspace_pos(wrap=True, as_degrees=True)
 
         self.draw_goal()
 
-        # self.draw_path(end_eff)
+        self.draw_end_eff(end_eff)
+        
+        self.draw_path(end_eff)
 
         # self.draw_collisions()
 
     def draw_path(self, end_eff):
         # Get the user-selected goal
         closest_goal = self.closest_goal
-        if closest_goal is None:
-            self.arm_to_goal_line.set_data([], [])
-            self.goal_to_arm_line.set_data([], [])
-            return
-        
-        # Determine if the path to the goal collides
-        # collides = Goal.path_collides(end_eff, closest_goal, self.collisions)
-        collides = False # Disabled to save resources
-        print("Path collides!" if collides else "Path clear!")
-        
-        # Set color
-        line_color = 'r' if collides else 'k'
-        self.arm_to_goal_line.set_color(line_color)
-        self.goal_to_arm_line.set_color(line_color)
 
-        # Draw the direct connection line
-        self.arm_to_goal_line.set_data([end_eff[0], closest_goal[0]], [end_eff[1], closest_goal[1]])
+        if self.dimensions == 2:
+            if closest_goal is None:
+                self.arm_to_goal_line.set_data([], [])
+                self.goal_to_arm_line.set_data([], [])
+                return
+            
+            # Determine if the path to the goal collides
+            # collides = Goal.path_collides(end_eff, closest_goal, self.collisions)
+            collides = False # Disabled to save resources
+            
+            # Set color
+            line_color = 'r' if collides else 'k'
+            self.arm_to_goal_line.set_color(line_color)
+            self.goal_to_arm_line.set_color(line_color)
 
-        # if the goal is not in the central quadrant, draw a line coming from the opposite quadrant
-        if help.get_quadrant(closest_goal, 360) != (0, 0):
-            quadrant_goal = help.get_quadrant(closest_goal, 360) # Get the quadrant of the closest goal
-            opposite_quadrant = help.get_opposite_quadrant(quadrant_goal) # Get the opposite quadrant
-            opposite_end = help.compute_quadrant(end_eff, opposite_quadrant, 360) # Get the position of the end effector in the opposite quadrant
-            centered_goal = help.compute_quadrant(closest_goal, (0, 0), 360) # Get the centered goal
-            self.goal_to_arm_line.set_data([opposite_end[0], centered_goal[0]], [opposite_end[1], centered_goal[1]]) # Draw the wrapping line
-        else:
-            self.goal_to_arm_line.set_data([], [])
-        
+            # Draw the direct connection line
+            self.arm_to_goal_line.set_data([end_eff[0], closest_goal[0]], [end_eff[1], closest_goal[1]])
+
+            # if the goal is not in the central quadrant, draw a line coming from the opposite quadrant
+            if help.get_quadrant(closest_goal, 360) != (0, 0):
+                quadrant_goal = help.get_quadrant(closest_goal, 360) # Get the quadrant of the closest goal
+                opposite_quadrant = help.get_opposite_quadrant(quadrant_goal) # Get the opposite quadrant
+                opposite_end = help.compute_quadrant(end_eff, opposite_quadrant, 360) # Get the position of the end effector in the opposite quadrant
+                centered_goal = help.compute_quadrant(closest_goal, (0, 0), 360) # Get the centered goal
+                self.goal_to_arm_line.set_data([opposite_end[0], centered_goal[0]], [opposite_end[1], centered_goal[1]]) # Draw the wrapping line
+            else:
+                self.goal_to_arm_line.set_data([], [])
+        elif self.dimensions == 3:
+            if closest_goal is None:
+                # Clear the lines (3D)
+                self.arm_to_goal_line.set_data([], [])
+                self.arm_to_goal_line.set_3d_properties([])
+                self.goal_to_arm_line.set_data([], [])
+                self.goal_to_arm_line.set_3d_properties([])
+                return
+            
+            # Draw the direct connection line
+            self.arm_to_goal_line.set_data([end_eff[0], closest_goal[0]], [end_eff[1], closest_goal[1]])
+            self.arm_to_goal_line.set_3d_properties([end_eff[2], closest_goal[2]])
 
     def draw_collisions(self, collisions):
         if self.dimensions == 2:

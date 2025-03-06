@@ -75,7 +75,7 @@ def spin():
         # Redraw the canvas
         draw()
 
-def pathfind():
+def move_to_goal():
     global goal_index
     goal_index = 0
     cspace_drawer.closest_goal = None # Avoids the line drawing bug
@@ -85,7 +85,7 @@ def pathfind():
 
     # Define animation parameters:
     anim_progress = 0.0   # progress from 0.0 (start) to 1.0 (goal)
-    anim_speed = 0.5      # speed factor (adjust as needed)
+    anim_speed = 0.25      # speed factor (adjust as needed)
     
     dt = 0
     last_time = None
@@ -104,6 +104,19 @@ def pathfind():
         draw()
     print("Goal reached!")
 
+def teleport_to_goals():
+    ik_sols = goal.get_cspace_pos(arm)
+
+    if False:
+        for i, angle in enumerate(ik_sols[2]):
+            arm.dh[i]['theta'] = np.radians(angle)
+    else:
+        for sol in ik_sols:
+            for i, angle in enumerate(sol):
+                arm.dh[i]['theta'] = np.radians(angle)
+            draw()
+        
+
 def scan(animate=False):
     global cspace_collisions
     
@@ -113,10 +126,15 @@ def scan(animate=False):
         elif animate:
             cspace_drawer.draw_collisions(cspace_collisions)
             draw()
-    
+
+def pathfind():
+    # goals = goal.get_cspace_pos(arm)
+    closest_goal = goal.get_paths(arm)[0][1]
+    cspace_drawer.closest_goal = closest_goal
+
 def control():
     global target
-    a_vel = np.radians(180)  # Angular velocity in radians per second
+    a_vel = np.radians(90)  # Angular velocity in radians per second
     lin_vel = 1  # Linear velocity in units per second
     control_mode = 1  # Default control mode (1 for arm, 2 for goal)
 
@@ -133,16 +151,19 @@ def control():
         elif is_key_down('2'):
             control_mode = 2
             print("Control mode: Goal")
-        elif is_key_down('p'):
-            print("Control mode: Pathfinding")
-            pathfind()
-        elif is_key_down('r'):
+        elif is_key_down('3'):
             print("Control mode: Scan")
             scan(True)
-        elif key_pressed('e'):
+        elif is_key_down('4'):
+            print("Teleporting to goals")
+            teleport_to_goals()
+        elif is_key_down('6'):
+            print("Moving to goal")
+            move_to_goal()
+        elif is_key_down('0'):
             cspace_drawer.draw_collisions(cspace_collisions)
             print("Showing collisions")
-        elif not is_key_down('e'):
+        elif not is_key_down('5'):
             cspace_drawer.draw_collisions([])
 
         # Control the arm or goal based on the control mode
@@ -159,6 +180,10 @@ def control():
             goal.x += lin_vel * dt * (1 if is_key_down('right') else -1 if is_key_down('left') else 0)
             if any(is_key_down(key) for key in ['up', 'down', 'left', 'right']):
                 print(f"Goal Position: ({goal.x:.2f}, {goal.y:.2f})")
+        
+        # Pathfind if any movement keys are pressed
+        if any(is_key_down(key) for key in ['up', 'down', 'left', 'right', 'a', 'd']):
+            pathfind()
         
         # Redraw
         draw()
