@@ -39,7 +39,7 @@ def listen_for_keys(fig):
 arm = Arm([
             {'theta': math.radians(0), 'r': 1},
             {'theta': math.radians(0), 'r': 1},
-            {'theta': math.radians(0), 'r': 1},
+            # {'theta': math.radians(0), 'r': 1},
         ])
 obstacle = (1, 1, 0.5) # x, y, radius
 goal = Goal(-0.5, 0.75)  # goal position in physical space
@@ -100,6 +100,8 @@ def move_to_goal():
         new_angles = [ start[i] + anim_progress * (target[i] - start[i]) for i in range(len(start)) ]
         arm.dh[0]['theta'] = np.radians(new_angles[0])
         arm.dh[1]['theta'] = np.radians(new_angles[1])
+        if arm.num_joints > 2:
+            arm.dh[2]['theta'] = np.radians(new_angles[2])
     
         draw()
     print("Goal reached!")
@@ -116,10 +118,9 @@ def teleport_to_goals():
                 arm.dh[i]['theta'] = np.radians(angle)
             draw()
         
-
 def scan(animate=False):
     global cspace_collisions
-    
+    cspace_collisions.clear()
     for c in arm.cspace_scanner(obstacle):
         if c is not None:
             cspace_collisions.extend(c)
@@ -129,8 +130,9 @@ def scan(animate=False):
 
 def pathfind():
     # goals = goal.get_cspace_pos(arm)
-    closest_goal = goal.get_paths(arm)[0][1]
-    cspace_drawer.closest_goal = closest_goal
+    global target
+    closest_goal = goal.pathfind(arm, cspace_collisions)
+    target = cspace_drawer.closest_goal = closest_goal
 
 def control():
     global target

@@ -165,7 +165,6 @@ class CSpaceDrawer:
                     self.goal_points[i]._offsets3d = ([pt[0]], [pt[1]], [pt[2]])
 
     def draw(self):
-        
         # Get current arm angles (in degrees)
         end_eff = self.arm.get_cspace_pos(wrap=True, as_degrees=True)
 
@@ -188,8 +187,7 @@ class CSpaceDrawer:
                 return
             
             # Determine if the path to the goal collides
-            # collides = Goal.path_collides(end_eff, closest_goal, self.collisions)
-            collides = False # Disabled to save resources
+            collides = False and Goal.path_collides(end_eff, closest_goal, self.collisions) # disabled for now
             
             # Set color
             line_color = 'r' if collides else 'k'
@@ -220,6 +218,18 @@ class CSpaceDrawer:
             # Draw the direct connection line
             self.arm_to_goal_line.set_data([end_eff[0], closest_goal[0]], [end_eff[1], closest_goal[1]])
             self.arm_to_goal_line.set_3d_properties([end_eff[2], closest_goal[2]])
+
+            # If the goal is not in the central quadrant, draw a line coming from the opposite quadrant
+            if help.get_quadrant(closest_goal, 360) != (0, 0, 0):
+                quadrant_goal = help.get_quadrant(closest_goal, 360)
+                opposite_quadrant = help.get_opposite_quadrant(quadrant_goal)
+                opposite_end = help.compute_quadrant(end_eff, opposite_quadrant, 360)
+                centered_goal = help.compute_quadrant(closest_goal, (0, 0, 0), 360)
+                self.goal_to_arm_line.set_data([opposite_end[0], centered_goal[0]], [opposite_end[1], centered_goal[1]])
+                self.goal_to_arm_line.set_3d_properties([opposite_end[2], centered_goal[2]])
+            else:
+                self.goal_to_arm_line.set_data([], [])
+                self.goal_to_arm_line.set_3d_properties([])
 
     def draw_collisions(self, collisions):
         if self.dimensions == 2:

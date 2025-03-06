@@ -139,11 +139,12 @@ class Goal:
 
         # find the first collision-free path
         for _, candidate in candidates:
-            if not Goal.path_collides(arm.get_cspace_pos(), candidate, collisions):
+            arm = arm.get_cspace_pos()
+            if not Goal.path_collides(arm, candidate, collisions):
                 return candidate
 
     @staticmethod
-    def path_collides(start_cspace, target_cspace, collision_list, threshold=10.0):
+    def path_collides(start_cspace, target_cspace, collision_list, threshold=30.0):
         # By default, use the provided start and target.
         p_start = np.array(start_cspace)
         p_target = np.array(target_cspace)
@@ -160,7 +161,7 @@ class Goal:
         
         for collision in collision_list:
             collision_np = np.array(collision)
-            dist = line_segment_distance(p_start, p_target, collision_np)
+            dist = help.line_segment_distance(p_start, p_target, collision_np)
             if dist < threshold:
                 return True
         return False
